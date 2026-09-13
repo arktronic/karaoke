@@ -1,0 +1,48 @@
+{
+  "name": "karaoke-creation-cli",
+  "version": "0.0.1",
+  "description": "Generate karaoke videos from an audio file and LRC/ASS lyrics, with a Butterchurn visualizer background.",
+  "license": "BSD-2-Clause",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "karaoke-creation-cli": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node esbuild.runtime.mjs",
+    "pretest": "pnpm build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "postinstall": "playwright install chromium"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "butterchurn": "^3.0.0-beta.4",
+    "butterchurn-presets": "^3.0.0-beta.4",
+    "jassub": "^2.4.0",
+    "lrc2ass": "workspace:*",
+    "mediabunny": "^1.0.0",
+    "playwright": "^1.49.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "esbuild": "^0.27.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

@@ -20,7 +20,8 @@ export const DEFAULT_PLAN_OPTIONS: PlanOptions = {
     blankGapMs: 3000,
   },
   layout: {
-    resolutionX: 384,
+    // 16:9 to match the actual video frame for wrap decisions.
+    resolutionX: 512,
     resolutionY: 288,
     alignment: 2,
     marginLeft: 10,
