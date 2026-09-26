@@ -114,49 +114,31 @@ describe('splitOverlongOccurrences', () => {
     expect(splitOverlongOccurrences([occurrence], 1_000, fontSizePx)).toEqual([occurrence]);
   });
 
-  it('wraps an overlong plain-text occurrence without changing its timing', () => {
+  it('leaves an overlong plain-text occurrence intact to overflow horizontally', () => {
     const occurrence: Occurrence = {
       startMs: 0,
       endMs: 10_000,
       text: 'one two three four five six seven eight nine ten',
     };
-    const maxWidthPx = estimateTextWidthPx('one two three', fontSizePx);
 
-    const result = splitOverlongOccurrences([occurrence], maxWidthPx, fontSizePx);
+    const result = splitOverlongOccurrences(
+      [occurrence],
+      estimateTextWidthPx('one two three', fontSizePx),
+      fontSizePx,
+    );
 
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ startMs: 0, endMs: 10_000 });
-    const lines = result[0].text.split('\n');
-    expect(lines.length).toBeGreaterThan(1);
-    expect(lines.every((line) => estimateTextWidthPx(line, fontSizePx) <= maxWidthPx)).toBe(true);
-    expect(lines.join(' ')).toBe(occurrence.text);
+    expect(result).toEqual([occurrence]);
   });
 
-  it('wraps short plain text without creating a synthetic timing boundary', () => {
-    const occurrence: Occurrence = { startMs: 0, endMs: 11, text: 'one two' };
-    const maxWidthPx = estimateTextWidthPx('one ', fontSizePx);
-
-    const result = splitOverlongOccurrences([occurrence], maxWidthPx, fontSizePx);
-
-    expect(result).toEqual([{ ...occurrence, text: 'one\ntwo' }]);
-  });
-
-  it('never wraps a punctuation-only token onto its own line', () => {
+  it('leaves an overlong single-segment enhanced occurrence intact without a timed split boundary', () => {
     const occurrence: Occurrence = {
-      startMs: 0,
-      endMs: 2_000,
-      text: 'AAAA BBBB CCCC DDDD EEEE ...',
+      startMs: 1_000,
+      endMs: 5_000,
+      text: 'one two three four',
+      segments: [{ text: 'one two three four', timeMs: 0, location: { line: 1, column: 1 } }],
     };
-    // Sized to fit exactly the first four words, forcing a split before "EEEE ...".
-    const maxWidthPx = estimateTextWidthPx('AAAA BBBB CCCC DDDD', fontSizePx);
 
-    const result = splitOverlongOccurrences([occurrence], maxWidthPx, fontSizePx);
-
-    expect(result).toHaveLength(1);
-    const lines = result[0].text.split('\n');
-    expect(lines.length).toBeGreaterThan(1);
-    expect(lines.every((line) => /^[^\p{L}\p{N}]+$/u.test(line.trim()))).toBe(false);
-    expect(lines[lines.length - 1].endsWith('...')).toBe(true);
+    expect(splitOverlongOccurrences([occurrence], 10, fontSizePx)).toEqual([occurrence]);
   });
 
   it('splits enhanced segments at a word boundary and rebases the second half timing to start at 0', () => {
@@ -186,36 +168,5 @@ describe('splitOverlongOccurrences', () => {
     expect(second.segments?.[0].timeMs).toBe(0);
     expect(second.startMs).toBe(first.endMs);
     expect(second.endMs).toBe(occurrence.endMs);
-  });
-
-  it('wraps a very long plain line into multiple visual lines in one occurrence', () => {
-    const occurrence: Occurrence = {
-      startMs: 0,
-      endMs: 20_000,
-      text: 'aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj',
-    };
-    const maxWidthPx = estimateTextWidthPx('aaaa bbbb', fontSizePx);
-
-    const result = splitOverlongOccurrences([occurrence], maxWidthPx, fontSizePx);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].text.split('\n').length).toBeGreaterThan(2);
-    expect(
-      result[0].text
-        .split('\n')
-        .every((line) => estimateTextWidthPx(line, fontSizePx) <= maxWidthPx),
-    ).toBe(true);
-  });
-
-  it('falls back to leaving an unsplittable single word as-is', () => {
-    const occurrence: Occurrence = {
-      startMs: 0,
-      endMs: 1_000,
-      text: 'Supercalifragilisticexpialidocious',
-    };
-
-    const result = splitOverlongOccurrences([occurrence], 10, fontSizePx);
-
-    expect(result).toEqual([occurrence]);
   });
 });

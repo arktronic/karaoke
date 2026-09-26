@@ -146,63 +146,16 @@ function findSegmentSplit(
   };
 }
 
-function wrapPlainTextLine(text: string, maxWidthPx: number, fontSizePx: number): string {
-  const tokens = text.match(/\S+|\s+/g);
-  if (!tokens) {
-    return text;
-  }
-  const lines: string[] = [];
-  let line = '';
-  let lineWidthPx = 0;
-  let hasWord = false;
-  for (const token of tokens) {
-    if (/^\s+$/.test(token)) {
-      line += token;
-      lineWidthPx += estimateTextWidthPx(token, fontSizePx);
-      continue;
-    }
-    const tokenWidthPx = estimateTextWidthPx(token, fontSizePx);
-    if (hasWord && lineWidthPx + tokenWidthPx > maxWidthPx && !isPunctuationOnly(token)) {
-      lines.push(line.trimEnd());
-      line = token;
-      lineWidthPx = tokenWidthPx;
-    } else {
-      line += token;
-      lineWidthPx += tokenWidthPx;
-    }
-    hasWord = true;
-  }
-  lines.push(line);
-  return lines.join('\n');
-}
-
-function wrapPlainText(text: string, maxWidthPx: number, fontSizePx: number): string {
-  return text
-    .split(/\r\n|\r|\n/)
-    .map((line) => wrapPlainTextLine(line, maxWidthPx, fontSizePx))
-    .join('\n');
-}
-
 function splitOccurrence(
   occurrence: Occurrence,
   maxWidthPx: number,
   fontSizePx: number,
 ): Occurrence[] {
-  if (estimateTextWidthPx(occurrence.text, fontSizePx) <= maxWidthPx) {
+  if (!occurrence.segments || occurrence.segments.length < 2) {
     return [occurrence];
   }
-  if (!occurrence.segments || occurrence.segments.length < 2) {
-    const wrappedOccurrence = {
-      ...occurrence,
-      text: wrapPlainText(occurrence.text, maxWidthPx, fontSizePx),
-    };
-    if (occurrence.segments?.length === 1) {
-      wrappedOccurrence.segments = occurrence.segments.map((segment) => ({
-        ...segment,
-        text: wrapPlainText(segment.text, maxWidthPx, fontSizePx),
-      }));
-    }
-    return [wrappedOccurrence];
+  if (estimateTextWidthPx(occurrence.text, fontSizePx) <= maxWidthPx) {
+    return [occurrence];
   }
 
   const split = findSegmentSplit(occurrence, maxWidthPx, fontSizePx);
@@ -220,7 +173,7 @@ function splitOccurrence(
   ];
 }
 
-// Wraps plain text inside its existing event; only enhanced occurrences split at real segment times.
+// Only enhanced occurrences split at real segment times; plain text stays on one visual line, even if it overflows.
 export function splitOverlongOccurrences(
   occurrences: Occurrence[],
   maxWidthPx: number,
