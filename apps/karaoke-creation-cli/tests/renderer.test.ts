@@ -22,7 +22,7 @@ describe('renderVideo resource cleanup', () => {
     mocks.readFile.mockResolvedValue(Buffer.from('audio'));
   });
 
-  it('closes the output and asset server when Chromium launch fails', async () => {
+  it('launches unified headless Chromium with GPU flags and cleans up on launch failure', async () => {
     const closeOutput = vi.fn().mockResolvedValue(undefined);
     const closeServer = vi.fn().mockResolvedValue(undefined);
     mocks.open.mockResolvedValue({ close: closeOutput, write: vi.fn() });
@@ -30,7 +30,7 @@ describe('renderVideo resource cleanup', () => {
       baseUrl: 'http://127.0.0.1:1234',
       close: closeServer,
     });
-    mocks.launch.mockRejectedValue(new Error('No display server'));
+    mocks.launch.mockRejectedValue(new Error('Chromium launch failed'));
 
     await expect(
       renderVideo({
@@ -44,8 +44,19 @@ describe('renderVideo resource cleanup', () => {
         },
         outputPath: 'output.mp4',
       }),
-    ).rejects.toThrow('No display server');
+    ).rejects.toThrow('Chromium launch failed');
 
+    expect(mocks.launch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headless: true,
+        channel: 'chromium',
+        args: expect.arrayContaining([
+          expect.stringMatching(/^--use-angle=/),
+          '--ignore-gpu-blocklist',
+          '--enable-gpu-rasterization',
+        ]),
+      }),
+    );
     expect(closeServer).toHaveBeenCalledOnce();
     expect(closeOutput).toHaveBeenCalledOnce();
   });

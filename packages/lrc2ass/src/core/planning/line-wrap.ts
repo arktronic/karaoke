@@ -15,6 +15,28 @@ const NARROW_CHARS = new Set('iIl.,:;\'"`!|()[]{}ftj-');
 const WIDE_CHARS = new Set('mMWw@%#&');
 const SAFETY_MARGIN_FACTOR = 1.08;
 
+function availableStyleWidthPx(
+  style: { marginLeft?: number; marginRight?: number },
+  options: ResolvedPlanOptions,
+  role: string,
+): number {
+  const {
+    resolutionX,
+    marginLeft: layoutMarginLeft,
+    marginRight: layoutMarginRight,
+  } = options.layout;
+  const marginLeft = style.marginLeft ?? layoutMarginLeft;
+  const marginRight = style.marginRight ?? layoutMarginRight;
+  const widthPx = resolutionX - marginLeft - marginRight;
+  if (widthPx <= 0) {
+    throw new RangeError(
+      `${role} margins must leave a positive text width; received ` +
+        `${resolutionX} - ${marginLeft} - ${marginRight} = ${widthPx}`,
+    );
+  }
+  return widthPx;
+}
+
 export function estimateTextWidthPx(text: string, fontSizePx: number): number {
   let widthFactorSum = 0;
   for (const char of text) {
@@ -42,19 +64,11 @@ export function computeWrapBudget(options: ResolvedPlanOptions): {
   const fontSizePx = preview
     ? Math.max(lyrics.fontSize ?? 28, preview.fontSize ?? 28)
     : (lyrics.fontSize ?? 28);
-  const marginLeft = preview
-    ? Math.max(
-        lyrics.marginLeft ?? options.layout.marginLeft,
-        preview.marginLeft ?? options.layout.marginLeft,
-      )
-    : (lyrics.marginLeft ?? options.layout.marginLeft);
-  const marginRight = preview
-    ? Math.max(
-        lyrics.marginRight ?? options.layout.marginRight,
-        preview.marginRight ?? options.layout.marginRight,
-      )
-    : (lyrics.marginRight ?? options.layout.marginRight);
-  return { maxWidthPx: options.layout.resolutionX - marginLeft - marginRight, fontSizePx };
+  const activeStyleWidths = [availableStyleWidthPx(lyrics, options, 'styles.lyrics')];
+  if (preview) {
+    activeStyleWidths.push(availableStyleWidthPx(preview, options, 'styles.preview'));
+  }
+  return { maxWidthPx: Math.min(...activeStyleWidths), fontSizePx };
 }
 
 function collapseSpaces(text: string): string {
@@ -132,49 +146,41 @@ function findSegmentSplit(
   };
 }
 
-// Plain (non-enhanced) lines have no per-word timing to split on, so the boundary's time is
-// estimated proportionally by character count instead of measured directly.
-function findPlainTextSplit(
-  occurrence: Occurrence,
-  maxWidthPx: number,
-  fontSizePx: number,
-): Split | undefined {
-  const tokens = occurrence.text.match(/\S+\s*/g);
-  if (!tokens || tokens.length < 2) {
-    return undefined;
+function wrapPlainTextLine(text: string, maxWidthPx: number, fontSizePx: number): string {
+  const tokens = text.match(/\S+|\s+/g);
+  if (!tokens) {
+    return text;
   }
-  let cumulativeWidthPx = 0;
-  let splitIndex: number | undefined;
-  for (let index = 0; index < tokens.length; index++) {
-    cumulativeWidthPx += estimateTextWidthPx(tokens[index], fontSizePx);
-    if (cumulativeWidthPx > maxWidthPx) {
-      splitIndex = index;
-      break;
+  const lines: string[] = [];
+  let line = '';
+  let lineWidthPx = 0;
+  let hasWord = false;
+  for (const token of tokens) {
+    if (/^\s+$/.test(token)) {
+      line += token;
+      lineWidthPx += estimateTextWidthPx(token, fontSizePx);
+      continue;
     }
+    const tokenWidthPx = estimateTextWidthPx(token, fontSizePx);
+    if (hasWord && lineWidthPx + tokenWidthPx > maxWidthPx && !isPunctuationOnly(token)) {
+      lines.push(line.trimEnd());
+      line = token;
+      lineWidthPx = tokenWidthPx;
+    } else {
+      line += token;
+      lineWidthPx += tokenWidthPx;
+    }
+    hasWord = true;
   }
-  if (splitIndex === undefined) {
-    return undefined;
-  }
-  splitIndex = Math.max(splitIndex, 1);
-  while (splitIndex < tokens.length && isPunctuationOnly(tokens[splitIndex])) {
-    splitIndex++;
-  }
-  if (splitIndex >= tokens.length) {
-    return undefined;
-  }
+  lines.push(line);
+  return lines.join('\n');
+}
 
-  const firstText = collapseSpaces(tokens.slice(0, splitIndex).join('')).trim();
-  const secondText = collapseSpaces(tokens.slice(splitIndex).join('')).trim();
-  const fraction = firstText.length / (firstText.length + secondText.length);
-  const splitAnchorMs =
-    occurrence.startMs + Math.round((occurrence.endMs - occurrence.startMs) * fraction);
-  if (splitAnchorMs <= occurrence.startMs || splitAnchorMs >= occurrence.endMs) {
-    return undefined;
-  }
-  return {
-    first: { startMs: occurrence.startMs, endMs: splitAnchorMs, text: firstText },
-    second: { startMs: splitAnchorMs, endMs: occurrence.endMs, text: secondText },
-  };
+function wrapPlainText(text: string, maxWidthPx: number, fontSizePx: number): string {
+  return text
+    .split(/\r\n|\r|\n/)
+    .map((line) => wrapPlainTextLine(line, maxWidthPx, fontSizePx))
+    .join('\n');
 }
 
 function splitOccurrence(
@@ -185,16 +191,24 @@ function splitOccurrence(
   if (estimateTextWidthPx(occurrence.text, fontSizePx) <= maxWidthPx) {
     return [occurrence];
   }
-  const split =
-    occurrence.segments && occurrence.segments.length > 1
-      ? findSegmentSplit(occurrence, maxWidthPx, fontSizePx)
-      : findPlainTextSplit(occurrence, maxWidthPx, fontSizePx);
-  // No word boundary could produce a valid two-sided split (e.g. a single unsplittable word);
-  // left as one occurrence for the \q2 no-wrap tag to bound to horizontal overflow instead.
-  if (!split) {
-    return [occurrence];
+  if (!occurrence.segments || occurrence.segments.length < 2) {
+    const wrappedOccurrence = {
+      ...occurrence,
+      text: wrapPlainText(occurrence.text, maxWidthPx, fontSizePx),
+    };
+    if (occurrence.segments?.length === 1) {
+      wrappedOccurrence.segments = occurrence.segments.map((segment) => ({
+        ...segment,
+        text: wrapPlainText(segment.text, maxWidthPx, fontSizePx),
+      }));
+    }
+    return [wrappedOccurrence];
   }
+
+  const split = findSegmentSplit(occurrence, maxWidthPx, fontSizePx);
+  // Without a usable real segment boundary, keep the occurrence intact rather than inventing timing.
   if (
+    !split ||
     quantizeBoundary(split.first.startMs) >= quantizeBoundary(split.first.endMs) ||
     quantizeBoundary(split.second.startMs) >= quantizeBoundary(split.second.endMs)
   ) {
@@ -206,9 +220,7 @@ function splitOccurrence(
   ];
 }
 
-// Expands any occurrence estimated too wide for one row into two or more, exactly as if the LRC
-// itself had that many separate timestamped lines — every downstream stage (deferred starts, row
-// rotation, lingering, previews, interludes) then schedules the pieces with no special-casing.
+// Wraps plain text inside its existing event; only enhanced occurrences split at real segment times.
 export function splitOverlongOccurrences(
   occurrences: Occurrence[],
   maxWidthPx: number,

@@ -1692,17 +1692,22 @@ describe('planEvents', () => {
     });
   });
 
-  it('does not add an interlude between split pieces of a plain-text lyric', () => {
+  it('auto-wraps an overlong plain lyric inside one dialogue event without changing its timing', () => {
+    const text = 'word '.repeat(30).trim();
     const normalized: NormalizedLyrics = {
-      occurrences: [{ startMs: 0, endMs: 100_000, text: 'word '.repeat(30).trim() }],
+      occurrences: [{ startMs: 0, endMs: 100_000, text }],
     };
 
     const document = planEvents(normalized, {
       ...options,
-      interlude: { minGapMs: 1_000, strategy: 'text', trailingLyricDurationMs: 2_000 },
+      interlude: { minGapMs: 1_000, strategy: 'text' },
     });
+    const lyricEvents = document.events.filter((event) => event.style === 'Lyrics');
 
-    expect(document.events.filter((event) => event.style === 'Lyrics').length).toBeGreaterThan(1);
+    expect(lyricEvents).toHaveLength(1);
+    expect(lyricEvents[0]).toMatchObject({ startMs: 0, endMs: 100_000 });
+    expect(lyricEvents[0].text).toContain('\\N');
+    expect(lyricEvents[0].text.replace('{\\q2}', '').split('\\N').join(' ')).toBe(text);
     expect(document.events.filter((event) => event.style === 'Interlude')).toEqual([]);
   });
 

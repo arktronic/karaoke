@@ -14,7 +14,11 @@ export async function renderOfflineFrames(
   let frameFailed = false;
   let frameError: unknown;
 
-  for (let frame = 0; frame < totalFrames; frame++) {
+  if (totalFrames > 0) {
+    await renderFrame(0, 0);
+  }
+
+  for (let frame = 1; frame < totalFrames; frame++) {
     const time = frame / fps;
     frameTasks.push(
       context.suspend(time).then(async () => {

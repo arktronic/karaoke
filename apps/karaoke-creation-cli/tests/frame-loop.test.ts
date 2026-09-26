@@ -13,6 +13,36 @@ function createDeferred<T>(): {
 }
 
 describe('renderOfflineFrames', () => {
+  it('renders frame zero directly and suspends only at future times', async () => {
+    const events: string[] = [];
+    const context = {
+      suspend: vi.fn(async (time: number) => {
+        events.push('suspend');
+        if (time <= 0) {
+          throw new Error('Suspension time must be in the future');
+        }
+      }),
+      resume: vi.fn(async () => {
+        events.push('resume');
+      }),
+      startRendering: vi.fn(async () => {
+        events.push('start');
+      }),
+    };
+    const renderFrame = vi.fn(async (frame: number, time: number) => {
+      events.push(`frame:${frame}:${time}`);
+    });
+
+    await renderOfflineFrames(context, 2, 24, renderFrame);
+
+    expect(events.slice(0, 3)).toEqual(['frame:0:0', 'suspend', 'start']);
+    expect(context.suspend).toHaveBeenCalledTimes(1);
+    expect(context.suspend).toHaveBeenCalledWith(1 / 24);
+    expect(renderFrame).toHaveBeenNthCalledWith(1, 0, 0);
+    expect(renderFrame).toHaveBeenCalledTimes(2);
+    expect(context.resume).toHaveBeenCalledTimes(1);
+  });
+
   it('resumes the context and propagates frame failures', async () => {
     const suspended = createDeferred<void>();
     const rendering = createDeferred<void>();
@@ -25,12 +55,15 @@ describe('renderOfflineFrames', () => {
       startRendering: vi.fn(() => rendering.promise),
     };
 
-    const renderPromise = renderOfflineFrames(context, 1, 24, async () => {
-      throw frameError;
+    const renderPromise = renderOfflineFrames(context, 2, 24, async (frame) => {
+      if (frame === 1) {
+        throw frameError;
+      }
     });
     suspended.resolve(undefined);
 
     await expect(renderPromise).rejects.toBe(frameError);
+    expect(context.suspend).toHaveBeenCalledWith(1 / 24);
     expect(context.resume).toHaveBeenCalledTimes(1);
   });
 });

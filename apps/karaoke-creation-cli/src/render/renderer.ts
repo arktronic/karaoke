@@ -34,7 +34,7 @@ function gpuAngleBackend(): string {
   return 'gl';
 }
 
-/** Launches headed (GPU-accelerated) Chromium and streams the composited karaoke video to `outputPath`. */
+/** Launches headless Chromium with GPU acceleration requested and streams video to `outputPath`. */
 export async function renderVideo({
   audioPath,
   assText,
@@ -64,10 +64,11 @@ export async function renderVideo({
     log(`asset server listening at ${assetServer.baseUrl}`);
 
     log('launching chromium');
-    // Headless Chromium falls back to a software GL/GPU path on many systems; running headed with
-    // explicit ANGLE/GPU flags gets real hardware acceleration for Butterchurn's WebGL rendering.
+    // Use unified headless Chromium (not Playwright's separate headless shell) so ANGLE can use
+    // the selected hardware backend for WebGL without displaying a browser window.
     const launchedBrowser = await chromium.launch({
-      headless: false,
+      headless: true,
+      channel: 'chromium',
       args: [
         `--use-angle=${gpuAngleBackend()}`,
         '--ignore-gpu-blocklist',

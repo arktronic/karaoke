@@ -1,5 +1,5 @@
 import { loadConfig, mergeConfig } from './core/config.js';
-import { resolveLyricsFile } from './core/input.js';
+import { resolveLyricsFileWithDiagnostics } from './core/input.js';
 import { renderVideo } from './render/renderer.js';
 import type { KaraokeConfigOverrides } from './types/options.js';
 
@@ -75,8 +75,8 @@ function parseArgs(argv: string[]): { parsed: ParsedArgs } | { error: string } {
 
 function parsePositiveInt(value: string, flag: string): number {
   const n = Number(value);
-  if (!Number.isInteger(n) || n <= 0) {
-    throw new Error(`${flag} must be a positive integer, got: ${value}`);
+  if (!Number.isSafeInteger(n) || n <= 0) {
+    throw new Error(`${flag} must be a positive safe integer, got: ${value}`);
   }
   return n;
 }
@@ -125,7 +125,17 @@ export async function runCli(
   try {
     const baseConfig = await loadConfig(configPath);
     const config = mergeConfig(baseConfig, overrides);
-    const assText = await resolveLyricsFile(lyrics as string);
+    const { text: assText, diagnostics } = await resolveLyricsFileWithDiagnostics(lyrics as string);
+    for (const diagnostic of diagnostics) {
+      const location = diagnostic.location
+        ? ` (${diagnostic.location.line}:${diagnostic.location.column})`
+        : '';
+      await writeStream(io.stderr, `${diagnostic.severity}: ${diagnostic.message}${location}\n`);
+    }
+    if (diagnostics.some((diagnostic) => diagnostic.severity === 'error')) {
+      return 1;
+    }
+
     await renderVideo({
       audioPath: audio as string,
       assText,

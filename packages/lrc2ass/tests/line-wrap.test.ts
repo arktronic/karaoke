@@ -61,12 +61,42 @@ describe('computeWrapBudget', () => {
     expect(maxWidthPx).toBe(384 - 20 - 20);
   });
 
+  it('uses the narrowest actual style width when left and right margins differ', () => {
+    const { maxWidthPx } = computeWrapBudget({
+      ...baseOptions,
+      preset: 'multi-line',
+      styles: {
+        lyrics: { marginLeft: 300, marginRight: 10 },
+        preview: { marginLeft: 10, marginRight: 300 },
+      },
+    });
+
+    expect(maxWidthPx).toBe(74);
+  });
+
+  it('rejects an active style with no positive text width', () => {
+    expect(() =>
+      computeWrapBudget({
+        ...baseOptions,
+        styles: { lyrics: { marginLeft: 374, marginRight: 10 } },
+      }),
+    ).toThrow('styles.lyrics margins must leave a positive text width');
+
+    expect(() =>
+      computeWrapBudget({
+        ...baseOptions,
+        preset: 'multi-line',
+        styles: { preview: { marginLeft: 200, marginRight: 184 } },
+      }),
+    ).toThrow('styles.preview margins must leave a positive text width');
+  });
+
   it('ignores preview styles when the preset does not show previews', () => {
     const { maxWidthPx, fontSizePx } = computeWrapBudget({
       ...baseOptions,
       styles: {
         lyrics: { fontSize: 32, marginLeft: 5, marginRight: 8 },
-        preview: { fontSize: 100, marginLeft: 100, marginRight: 100 },
+        preview: { fontSize: 100, marginLeft: 384, marginRight: 0 },
       },
     });
 
@@ -84,7 +114,7 @@ describe('splitOverlongOccurrences', () => {
     expect(splitOverlongOccurrences([occurrence], 1_000, fontSizePx)).toEqual([occurrence]);
   });
 
-  it('splits an overlong plain-text occurrence into word-boundary pieces that each fit the budget', () => {
+  it('wraps an overlong plain-text occurrence without changing its timing', () => {
     const occurrence: Occurrence = {
       startMs: 0,
       endMs: 10_000,
@@ -94,29 +124,24 @@ describe('splitOverlongOccurrences', () => {
 
     const result = splitOverlongOccurrences([occurrence], maxWidthPx, fontSizePx);
 
-    expect(result.length).toBeGreaterThan(1);
-    for (const piece of result) {
-      expect(estimateTextWidthPx(piece.text, fontSizePx)).toBeLessThanOrEqual(maxWidthPx);
-    }
-    // Pieces are contiguous in time and reconstruct the original text in order.
-    expect(result[0].startMs).toBe(0);
-    expect(result[result.length - 1].endMs).toBe(10_000);
-    for (let index = 1; index < result.length; index++) {
-      expect(result[index].startMs).toBe(result[index - 1].endMs);
-    }
-    expect(result.map((piece) => piece.text).join(' ')).toBe(occurrence.text);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ startMs: 0, endMs: 10_000 });
+    const lines = result[0].text.split('\n');
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines.every((line) => estimateTextWidthPx(line, fontSizePx) <= maxWidthPx)).toBe(true);
+    expect(lines.join(' ')).toBe(occurrence.text);
   });
 
-  it('declines a split when a child collapses under 10 ms boundary quantization', () => {
+  it('wraps short plain text without creating a synthetic timing boundary', () => {
     const occurrence: Occurrence = { startMs: 0, endMs: 11, text: 'one two' };
     const maxWidthPx = estimateTextWidthPx('one ', fontSizePx);
 
     const result = splitOverlongOccurrences([occurrence], maxWidthPx, fontSizePx);
 
-    expect(result).toEqual([occurrence]);
+    expect(result).toEqual([{ ...occurrence, text: 'one\ntwo' }]);
   });
 
-  it('never puts a punctuation-only token on its own new line', () => {
+  it('never wraps a punctuation-only token onto its own line', () => {
     const occurrence: Occurrence = {
       startMs: 0,
       endMs: 2_000,
@@ -127,11 +152,11 @@ describe('splitOverlongOccurrences', () => {
 
     const result = splitOverlongOccurrences([occurrence], maxWidthPx, fontSizePx);
 
-    expect(result.length).toBeGreaterThan(1);
-    for (const piece of result) {
-      expect(/^[^\p{L}\p{N}]+$/u.test(piece.text.trim())).toBe(false);
-    }
-    expect(result[result.length - 1].text.endsWith('...')).toBe(true);
+    expect(result).toHaveLength(1);
+    const lines = result[0].text.split('\n');
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines.every((line) => /^[^\p{L}\p{N}]+$/u.test(line.trim()))).toBe(false);
+    expect(lines[lines.length - 1].endsWith('...')).toBe(true);
   });
 
   it('splits enhanced segments at a word boundary and rebases the second half timing to start at 0', () => {
@@ -163,7 +188,7 @@ describe('splitOverlongOccurrences', () => {
     expect(second.endMs).toBe(occurrence.endMs);
   });
 
-  it('splits recursively as many times as needed for a very long line', () => {
+  it('wraps a very long plain line into multiple visual lines in one occurrence', () => {
     const occurrence: Occurrence = {
       startMs: 0,
       endMs: 20_000,
@@ -173,10 +198,13 @@ describe('splitOverlongOccurrences', () => {
 
     const result = splitOverlongOccurrences([occurrence], maxWidthPx, fontSizePx);
 
-    expect(result.length).toBeGreaterThan(2);
-    for (const piece of result) {
-      expect(estimateTextWidthPx(piece.text, fontSizePx)).toBeLessThanOrEqual(maxWidthPx);
-    }
+    expect(result).toHaveLength(1);
+    expect(result[0].text.split('\n').length).toBeGreaterThan(2);
+    expect(
+      result[0].text
+        .split('\n')
+        .every((line) => estimateTextWidthPx(line, fontSizePx) <= maxWidthPx),
+    ).toBe(true);
   });
 
   it('falls back to leaving an unsplittable single word as-is', () => {
