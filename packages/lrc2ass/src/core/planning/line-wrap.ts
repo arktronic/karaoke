@@ -1,5 +1,6 @@
 import type { Occurrence } from '../../types/index.js';
-import type { ResolvedPlanOptions } from './options.js';
+import { PLAN_PRESETS, type ResolvedPlanOptions } from './options.js';
+import { quantizeBoundary } from './timing.js';
 
 // Rough per-character advance widths as a fraction of font size, bucketed since real glyph metrics
 // aren't available to this renderer-agnostic core (see design.md: no runtime dependencies). Biased
@@ -36,16 +37,23 @@ export function computeWrapBudget(options: ResolvedPlanOptions): {
   fontSizePx: number;
 } {
   const lyrics = options.styles.lyrics ?? {};
-  const preview = options.styles.preview ?? {};
-  const fontSizePx = Math.max(lyrics.fontSize ?? 28, preview.fontSize ?? 28);
-  const marginLeft = Math.max(
-    lyrics.marginLeft ?? options.layout.marginLeft,
-    preview.marginLeft ?? options.layout.marginLeft,
-  );
-  const marginRight = Math.max(
-    lyrics.marginRight ?? options.layout.marginRight,
-    preview.marginRight ?? options.layout.marginRight,
-  );
+  const showPreview = PLAN_PRESETS[options.preset].showPreview;
+  const preview = showPreview ? (options.styles.preview ?? {}) : undefined;
+  const fontSizePx = preview
+    ? Math.max(lyrics.fontSize ?? 28, preview.fontSize ?? 28)
+    : (lyrics.fontSize ?? 28);
+  const marginLeft = preview
+    ? Math.max(
+        lyrics.marginLeft ?? options.layout.marginLeft,
+        preview.marginLeft ?? options.layout.marginLeft,
+      )
+    : (lyrics.marginLeft ?? options.layout.marginLeft);
+  const marginRight = preview
+    ? Math.max(
+        lyrics.marginRight ?? options.layout.marginRight,
+        preview.marginRight ?? options.layout.marginRight,
+      )
+    : (lyrics.marginRight ?? options.layout.marginRight);
   return { maxWidthPx: options.layout.resolutionX - marginLeft - marginRight, fontSizePx };
 }
 
@@ -184,6 +192,12 @@ function splitOccurrence(
   // No word boundary could produce a valid two-sided split (e.g. a single unsplittable word);
   // left as one occurrence for the \q2 no-wrap tag to bound to horizontal overflow instead.
   if (!split) {
+    return [occurrence];
+  }
+  if (
+    quantizeBoundary(split.first.startMs) >= quantizeBoundary(split.first.endMs) ||
+    quantizeBoundary(split.second.startMs) >= quantizeBoundary(split.second.endMs)
+  ) {
     return [occurrence];
   }
   return [

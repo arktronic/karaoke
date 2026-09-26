@@ -42,6 +42,21 @@ describe('planEvents', () => {
     ]);
   });
 
+  it('does not split single-line lyrics to fit an unused preview style', () => {
+    const document = planEvents(
+      { occurrences: [{ startMs: 0, endMs: 1_000, text: 'hello world' }] },
+      {
+        ...options,
+        styles: { preview: { fontSize: 100, marginLeft: 100, marginRight: 100 } },
+      },
+    );
+
+    expect(document.events.filter((event) => event.style === 'Lyrics')).toHaveLength(1);
+    expect(document.events.find((event) => event.style === 'Lyrics')?.text).toBe(
+      '{\\q2}hello world',
+    );
+  });
+
   it('preserves base values when overrides are undefined and applies defined layout overrides', () => {
     const document = planEvents({ occurrences: [] }, options, {
       karaokeEffect: undefined,
@@ -1675,6 +1690,20 @@ describe('planEvents', () => {
       style: 'Interlude',
       text: '♪ Instrumental ♪',
     });
+  });
+
+  it('does not add an interlude between split pieces of a plain-text lyric', () => {
+    const normalized: NormalizedLyrics = {
+      occurrences: [{ startMs: 0, endMs: 100_000, text: 'word '.repeat(30).trim() }],
+    };
+
+    const document = planEvents(normalized, {
+      ...options,
+      interlude: { minGapMs: 1_000, strategy: 'text', trailingLyricDurationMs: 2_000 },
+    });
+
+    expect(document.events.filter((event) => event.style === 'Lyrics').length).toBeGreaterThan(1);
+    expect(document.events.filter((event) => event.style === 'Interlude')).toEqual([]);
   });
 
   it('does not truncate the final lyric with trailingLyricDurationMs when no lyric follows', () => {

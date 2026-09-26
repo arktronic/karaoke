@@ -42,15 +42,26 @@ export function planEvents(
   const options = resolvePlanOptions(baseOptions, overrideOptions);
   assertPlanOptions(options);
   const wrapBudget = computeWrapBudget(options);
-  const occurrences = splitOverlongOccurrences(
-    normalized.occurrences,
-    wrapBudget.maxWidthPx,
-    wrapBudget.fontSizePx,
-  );
+  const occurrences: NormalizedLyrics['occurrences'] = [];
+  const sourceOccurrenceIndices: number[] = [];
+  const isFinalSplitPiece: boolean[] = [];
+  normalized.occurrences.forEach((sourceOccurrence, sourceOccurrenceIndex) => {
+    const pieces = splitOverlongOccurrences(
+      [sourceOccurrence],
+      wrapBudget.maxWidthPx,
+      wrapBudget.fontSizePx,
+    );
+    pieces.forEach((piece, pieceIndex) => {
+      occurrences.push(piece);
+      sourceOccurrenceIndices.push(sourceOccurrenceIndex);
+      isFinalSplitPiece.push(pieceIndex === pieces.length - 1);
+    });
+  });
   const events: AssEvent[] = [];
   const lyricOccurrences: Array<{
     event: AssEvent;
     occurrence: NormalizedLyrics['occurrences'][number];
+    sourceOccurrenceIndex: number;
     showedPreSweep: boolean;
   }> = [];
   // Events exempted from fadeInMs/fadeOutMs at a Preview->Lyrics handoff (same row, no visual gap).
@@ -100,8 +111,8 @@ export function planEvents(
   let groupHasVisibleMember = false;
   let previousStartMs: number | undefined;
   for (let position = sortedByDeferredStart.length - 1; position >= 0; position--) {
-    const sourceIndex = sortedByDeferredStart[position];
-    const startMs = deferredStarts[sourceIndex];
+    const occurrenceIndex = sortedByDeferredStart[position];
+    const startMs = deferredStarts[occurrenceIndex];
     if (previousStartMs !== undefined && startMs !== previousStartMs) {
       if (groupHasVisibleMember) {
         nextVisibleStartMs = previousStartMs;
@@ -109,11 +120,13 @@ export function planEvents(
       groupHasVisibleMember = false;
     }
     const endMs = quantizeBoundary(
-      lyricEndMs(occurrences[sourceIndex], nextVisibleStartMs, options),
+      isFinalSplitPiece[occurrenceIndex]
+        ? lyricEndMs(occurrences[occurrenceIndex], nextVisibleStartMs, options)
+        : occurrences[occurrenceIndex].endMs,
     );
     if (endMs > startMs) {
-      isVisible[sourceIndex] = true;
-      resolvedEndMs[sourceIndex] = endMs;
+      isVisible[occurrenceIndex] = true;
+      resolvedEndMs[occurrenceIndex] = endMs;
       groupHasVisibleMember = true;
     }
     previousStartMs = startMs;
@@ -164,7 +177,12 @@ export function planEvents(
         style: LYRIC_STYLE_NAME,
         text: NO_WRAP_TAG + text,
       };
-      lyricOccurrences.push({ event, occurrence, showedPreSweep });
+      lyricOccurrences.push({
+        event,
+        occurrence,
+        sourceOccurrenceIndex: sourceOccurrenceIndices[index],
+        showedPreSweep,
+      });
       events.push(event);
       groupMaxEndMs = Math.max(groupMaxEndMs, endMs);
     }
@@ -370,7 +388,7 @@ export function planEvents(
 
   addInterludeEvents(
     events,
-    lyricOccurrences.map(({ event }) => event),
+    lyricOccurrences.map(({ event, sourceOccurrenceIndex }) => ({ event, sourceOccurrenceIndex })),
     options,
   );
 

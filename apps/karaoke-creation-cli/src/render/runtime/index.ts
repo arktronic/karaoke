@@ -9,6 +9,7 @@ import {
   Quality,
   StreamTarget,
 } from 'mediabunny';
+import { renderOfflineFrames } from './frame-loop.js';
 
 // esbuild's CJS interop wraps this package's own (webpack-built) `default` export in another
 // `.default`, so unwrap defensively rather than assuming a single level of wrapping.
@@ -176,34 +177,26 @@ export async function renderKaraoke(options: RuntimeOptions): Promise<void> {
   await output.start();
   console.log('[runtime] mediabunny output started, beginning frame-stepped offline render');
 
-  for (let frame = 0; frame < totalFrames; frame++) {
-    const t = frame / fps;
-    // `resume()` is only called once this frame's canvas snapshot has been added to the output,
-    // so the offline audio graph never advances past a suspend point before its frame is captured.
-    offlineContext.suspend(t).then(async () => {
-      if (frame % 300 === 0) {
-        console.log(`[runtime] rendering frame ${frame}/${totalFrames}`);
-      }
-      visualizer.render();
-      // manualRender round-trips to JASSUB's worker before painting subtitleCanvas, so it must be
-      // awaited before compositing, or the canvas will still hold the previous (or no) frame.
-      await jassub.manualRender({
-        expectedDisplayTime: performance.now(),
-        width,
-        height,
-        mediaTime: t,
-      });
-
-      compositeCtx.clearRect(0, 0, width, height);
-      compositeCtx.drawImage(vizCanvas, 0, 0);
-      compositeCtx.drawImage(subtitleCanvas, 0, 0);
-
-      await videoSource.add(t, 1 / fps);
-      return offlineContext.resume();
+  await renderOfflineFrames(offlineContext, totalFrames, fps, async (frame, time) => {
+    if (frame % 300 === 0) {
+      console.log(`[runtime] rendering frame ${frame}/${totalFrames}`);
+    }
+    visualizer.render();
+    // manualRender round-trips to JASSUB's worker before painting subtitleCanvas, so it must be
+    // awaited before compositing, or the canvas will still hold the previous (or no) frame.
+    await jassub.manualRender({
+      expectedDisplayTime: performance.now(),
+      width,
+      height,
+      mediaTime: time,
     });
-  }
 
-  await offlineContext.startRendering();
+    compositeCtx.clearRect(0, 0, width, height);
+    compositeCtx.drawImage(vizCanvas, 0, 0);
+    compositeCtx.drawImage(subtitleCanvas, 0, 0);
+
+    await videoSource.add(time, 1 / fps);
+  });
   console.log('[runtime] offline audio rendering and video frame capture complete, adding audio');
 
   await audioSource.add(audioBuffer);

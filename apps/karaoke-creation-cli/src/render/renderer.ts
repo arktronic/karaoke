@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { startAssetServer } from './server.js';
+import { startAssetServer, type AssetServer } from './server.js';
 import type { KaraokeConfig } from '../types/options.js';
 
 const APP_DIST_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -42,31 +42,41 @@ export async function renderVideo({
   outputPath,
 }: RenderInputs): Promise<void> {
   const audioBytes = await readFile(audioPath);
-  const outputHandle = await open(outputPath, 'w');
+  let outputHandle: Awaited<ReturnType<typeof open>> | undefined;
+  let server: AssetServer | undefined;
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  let renderFailed = false;
+  let cleanupError: AggregateError | undefined;
 
-  log('starting asset server');
-  const server = await startAssetServer(
-    [
-      { prefix: '/dist', dir: APP_DIST_DIR },
-      { prefix: '/jassub', dir: JASSUB_DIST_DIR },
-    ],
-    INDEX_HTML,
-  );
-  log(`asset server listening at ${server.baseUrl}`);
-
-  log('launching chromium');
-  // Headless Chromium falls back to a software GL/GPU path on many systems; running headed with
-  // explicit ANGLE/GPU flags gets real hardware acceleration for Butterchurn's WebGL rendering.
-  const browser = await chromium.launch({
-    headless: false,
-    args: [
-      `--use-angle=${gpuAngleBackend()}`,
-      '--ignore-gpu-blocklist',
-      '--enable-gpu-rasterization',
-    ],
-  });
   try {
-    const page = await browser.newPage();
+    const openedOutput = await open(outputPath, 'w');
+    outputHandle = openedOutput;
+
+    log('starting asset server');
+    const assetServer = await startAssetServer(
+      [
+        { prefix: '/dist', dir: APP_DIST_DIR },
+        { prefix: '/jassub', dir: JASSUB_DIST_DIR },
+      ],
+      INDEX_HTML,
+    );
+    server = assetServer;
+    log(`asset server listening at ${assetServer.baseUrl}`);
+
+    log('launching chromium');
+    // Headless Chromium falls back to a software GL/GPU path on many systems; running headed with
+    // explicit ANGLE/GPU flags gets real hardware acceleration for Butterchurn's WebGL rendering.
+    const launchedBrowser = await chromium.launch({
+      headless: false,
+      args: [
+        `--use-angle=${gpuAngleBackend()}`,
+        '--ignore-gpu-blocklist',
+        '--enable-gpu-rasterization',
+      ],
+    });
+    browser = launchedBrowser;
+
+    const page = await launchedBrowser.newPage();
     page.on('console', (msg) => log(`[browser:${msg.type()}] ${msg.text()}`));
     page.on('pageerror', (error) => log(`[browser:pageerror] ${error}`));
     page.on('requestfailed', (request) =>
@@ -85,19 +95,19 @@ export async function renderVideo({
     // buffer of the whole file and a base64 return value that could exceed the page's max string length.
     await page.exposeFunction('__writeChunk', async (base64: string, position: number) => {
       const buffer = Buffer.from(base64, 'base64');
-      await outputHandle.write(buffer, 0, buffer.length, position);
+      await openedOutput.write(buffer, 0, buffer.length, position);
     });
 
-    log(`navigating to ${server.baseUrl}/`);
-    await page.goto(`${server.baseUrl}/`);
+    log(`navigating to ${assetServer.baseUrl}/`);
+    await page.goto(`${assetServer.baseUrl}/`);
     log('waiting for __renderKaraoke to be defined');
     await page.waitForFunction(
       () => typeof (globalThis as { __renderKaraoke?: unknown }).__renderKaraoke === 'function',
     );
     log('runtime script loaded, invoking __renderKaraoke');
 
-    const jassubBaseUrl = `${server.baseUrl}/jassub`;
-    const jassubWorkerUrl = `${server.baseUrl}/dist/jassub-worker.js`;
+    const jassubBaseUrl = `${assetServer.baseUrl}/jassub`;
+    const jassubWorkerUrl = `${assetServer.baseUrl}/dist/jassub-worker.js`;
     await page.evaluate(
       ({
         audioBase64,
@@ -138,10 +148,35 @@ export async function renderVideo({
     );
 
     log('__renderKaraoke resolved');
+  } catch (error) {
+    renderFailed = true;
+    throw error;
   } finally {
-    log('closing browser and asset server');
-    await browser.close();
-    await server.close();
-    await outputHandle.close();
+    log('closing browser, asset server, and output file');
+    const cleanups: Array<() => Promise<void> | undefined> = [];
+    if (browser) cleanups.push(() => browser!.close());
+    if (server) cleanups.push(() => server!.close());
+    if (outputHandle) cleanups.push(() => outputHandle!.close());
+
+    const cleanupErrors: unknown[] = [];
+    for (const cleanup of cleanups) {
+      try {
+        await cleanup();
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
+    if (cleanupErrors.length > 0) {
+      const error = new AggregateError(cleanupErrors, 'Failed to clean up renderer resources');
+      if (renderFailed) {
+        log(error.message);
+      } else {
+        cleanupError = error;
+      }
+    }
+  }
+
+  if (cleanupError) {
+    throw cleanupError;
   }
 }

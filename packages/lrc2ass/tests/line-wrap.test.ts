@@ -50,6 +50,7 @@ describe('computeWrapBudget', () => {
   it('picks the larger font size and narrower margins across lyrics/preview styles', () => {
     const { maxWidthPx, fontSizePx } = computeWrapBudget({
       ...baseOptions,
+      preset: 'multi-line',
       styles: {
         lyrics: { fontSize: 40, marginLeft: 5, marginRight: 5 },
         preview: { fontSize: 28, marginLeft: 20, marginRight: 20 },
@@ -58,6 +59,19 @@ describe('computeWrapBudget', () => {
 
     expect(fontSizePx).toBe(40);
     expect(maxWidthPx).toBe(384 - 20 - 20);
+  });
+
+  it('ignores preview styles when the preset does not show previews', () => {
+    const { maxWidthPx, fontSizePx } = computeWrapBudget({
+      ...baseOptions,
+      styles: {
+        lyrics: { fontSize: 32, marginLeft: 5, marginRight: 8 },
+        preview: { fontSize: 100, marginLeft: 100, marginRight: 100 },
+      },
+    });
+
+    expect(fontSizePx).toBe(32);
+    expect(maxWidthPx).toBe(384 - 5 - 8);
   });
 });
 
@@ -91,6 +105,15 @@ describe('splitOverlongOccurrences', () => {
       expect(result[index].startMs).toBe(result[index - 1].endMs);
     }
     expect(result.map((piece) => piece.text).join(' ')).toBe(occurrence.text);
+  });
+
+  it('declines a split when a child collapses under 10 ms boundary quantization', () => {
+    const occurrence: Occurrence = { startMs: 0, endMs: 11, text: 'one two' };
+    const maxWidthPx = estimateTextWidthPx('one ', fontSizePx);
+
+    const result = splitOverlongOccurrences([occurrence], maxWidthPx, fontSizePx);
+
+    expect(result).toEqual([occurrence]);
   });
 
   it('never puts a punctuation-only token on its own new line', () => {

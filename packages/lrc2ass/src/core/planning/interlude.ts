@@ -20,7 +20,7 @@ function roundedRectPath(width: number, height: number, radius: number): string 
 
 export function addInterludeEvents(
   events: AssEvent[],
-  lyricEvents: AssEvent[],
+  lyricEvents: Array<{ event: AssEvent; sourceOccurrenceIndex: number }>,
   options: ResolvedPlanOptions,
 ): void {
   const interlude = options.interlude;
@@ -30,8 +30,12 @@ export function addInterludeEvents(
 
   // Starts at 0 so a leading gap before the very first lyric (e.g. an instrumental intro) is detected too.
   let latestActiveEndMs = 0;
-  for (const event of lyricEvents) {
-    const bounds = resolveInterludeBounds(latestActiveEndMs, event.startMs, interlude);
+  let previousSourceOccurrenceIndex: number | undefined;
+  for (const { event, sourceOccurrenceIndex } of lyricEvents) {
+    const bounds =
+      sourceOccurrenceIndex === previousSourceOccurrenceIndex
+        ? undefined
+        : resolveInterludeBounds(latestActiveEndMs, event.startMs, interlude);
 
     if (bounds) {
       const { startMs, endMs } = bounds;
@@ -84,5 +88,6 @@ export function addInterludeEvents(
     }
 
     latestActiveEndMs = Math.max(latestActiveEndMs, event.endMs);
+    previousSourceOccurrenceIndex = sourceOccurrenceIndex;
   }
 }
