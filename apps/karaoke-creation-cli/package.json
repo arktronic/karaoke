@@ -24,7 +24,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "format": "prettier --write .",
+    "format": "prettier --write . --ignore-path ../../.gitignore",
     "postinstall": "playwright install chromium"
   },
   "engines": {

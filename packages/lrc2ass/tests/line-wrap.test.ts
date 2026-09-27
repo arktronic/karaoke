@@ -141,6 +141,40 @@ describe('splitOverlongOccurrences', () => {
     expect(splitOverlongOccurrences([occurrence], 10, fontSizePx)).toEqual([occurrence]);
   });
 
+  it('does not split syllable-timed enhanced text without a timed word boundary', () => {
+    const occurrence: Occurrence = {
+      startMs: 1_000,
+      endMs: 5_000,
+      text: 'Hello!',
+      segments: [
+        { text: 'He', timeMs: 0, location: { line: 1, column: 1 } },
+        { text: 'llo', timeMs: 500, location: { line: 1, column: 3 } },
+        { text: '!', timeMs: 1_000, location: { line: 1, column: 6 } },
+      ],
+    };
+    const maxWidthPx = estimateTextWidthPx('He', fontSizePx) + 1;
+
+    expect(estimateTextWidthPx(occurrence.text, fontSizePx)).toBeGreaterThan(maxWidthPx);
+    expect(splitOverlongOccurrences([occurrence], maxWidthPx, fontSizePx)).toEqual([occurrence]);
+  });
+
+  it('keeps punctuation with the preceding word when splitting at whitespace', () => {
+    const occurrence: Occurrence = {
+      startMs: 1_000,
+      endMs: 5_000,
+      text: 'one! two',
+      segments: [
+        { text: 'one! ', timeMs: 0, location: { line: 1, column: 1 } },
+        { text: 'two', timeMs: 1_000, location: { line: 1, column: 6 } },
+      ],
+    };
+    const maxWidthPx = estimateTextWidthPx('one! ', fontSizePx) + 1;
+
+    const result = splitOverlongOccurrences([occurrence], maxWidthPx, fontSizePx);
+
+    expect(result.map(({ text }) => text)).toEqual(['one!', 'two']);
+  });
+
   it('splits enhanced segments at a word boundary and rebases the second half timing to start at 0', () => {
     const occurrence: Occurrence = {
       startMs: 1_000,

@@ -82,13 +82,23 @@ function isPunctuationOnly(text: string): boolean {
   return trimmed.length === 0 || /^[^\p{L}\p{N}]+$/u.test(trimmed);
 }
 
+function isWordSplitBoundary(
+  segments: NonNullable<Occurrence['segments']>,
+  index: number,
+): boolean {
+  return (
+    !isPunctuationOnly(segments[index].text) &&
+    (/\s$/.test(segments[index - 1].text) || /^\s/.test(segments[index].text))
+  );
+}
+
 interface Split {
   first: Occurrence;
   second: Occurrence;
 }
 
-// Splits at the first enhanced-segment (word-level) boundary whose cumulative width would exceed
-// maxWidthPx, so text and karaoke timing stay in lockstep; segments are the same unit
+// Splits only at whitespace-adjacent enhanced-segment boundaries, so text and karaoke timing stay
+// in lockstep; segments are the same unit
 // karaokeText() renders, so measuring/splitting on them can't disagree with what's actually shown.
 function findSegmentSplit(
   occurrence: Occurrence,
@@ -100,24 +110,34 @@ function findSegmentSplit(
     return undefined;
   }
   let cumulativeWidthPx = 0;
-  let splitIndex: number | undefined;
+  let overflowIndex: number | undefined;
   for (let index = 0; index < segments.length; index++) {
     cumulativeWidthPx += estimateTextWidthPx(segments[index].text, fontSizePx);
     if (cumulativeWidthPx > maxWidthPx) {
-      splitIndex = index;
+      overflowIndex = index;
       break;
     }
   }
-  if (splitIndex === undefined) {
+  if (overflowIndex === undefined) {
     return undefined;
   }
-  // Always leave at least one word on the first line, even if it alone doesn't fit (an
-  // unsplittable overflow the \q2 no-wrap tag must then absorb).
-  splitIndex = Math.max(splitIndex, 1);
-  while (splitIndex < segments.length && isPunctuationOnly(segments[splitIndex].text)) {
-    splitIndex++;
+
+  let previousBoundary: number | undefined;
+  let nextBoundary: number | undefined;
+  for (let index = 1; index < segments.length; index++) {
+    if (!isWordSplitBoundary(segments, index)) {
+      continue;
+    }
+    if (index <= overflowIndex) {
+      previousBoundary = index;
+    } else if (nextBoundary === undefined) {
+      nextBoundary = index;
+    }
   }
-  if (splitIndex >= segments.length) {
+  // Keep the word that crosses the width on the next line where possible. If the first word
+  // itself is too wide, split after it so later words can still wrap.
+  const splitIndex = previousBoundary ?? nextBoundary;
+  if (splitIndex === undefined) {
     return undefined;
   }
 
