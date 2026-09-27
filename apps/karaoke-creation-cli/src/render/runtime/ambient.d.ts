@@ -4,7 +4,7 @@ declare module 'butterchurn' {
   interface ButterchurnVisualizer {
     connectAudio(node: AudioNode): void;
     loadPreset(preset: unknown, blendSeconds: number): void;
-    render(): void;
+    render(options?: { elapsedTime?: number }): void;
     setRendererSize(width: number, height: number): void;
   }
 

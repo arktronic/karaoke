@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { runCli } from '../src/cli.js';
 import { resolveLyricsFileWithDiagnostics } from '../src/core/input.js';
 import { renderVideo } from '../src/render/renderer.js';
@@ -58,6 +61,87 @@ describe('runCli', () => {
     const code = await runCli(['--bogus', 'value'], io);
     expect(code).toBe(1);
     expect(stderrText()).toContain('Unknown option: --bogus');
+  });
+
+  it('rejects simultaneous named and file preset options', async () => {
+    const { io, stderrText } = makeIo();
+    const code = await runCli(
+      [
+        '--audio',
+        'song.mp3',
+        '--lyrics',
+        'song.lrc',
+        '--output',
+        'out.mp4',
+        '--preset',
+        'named',
+        '--preset-file',
+        'custom.json',
+      ],
+      io,
+    );
+
+    expect(code).toBe(1);
+    expect(stderrText()).toContain('--preset and --preset-file cannot be used together');
+    expect(renderVideo).not.toHaveBeenCalled();
+  });
+
+  it('loads and forwards a preset JSON object to the renderer', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'karaoke-preset-'));
+    const presetFile = join(directory, 'custom.json');
+    const presetData = { name: 'custom', baseVals: { zoom: 1 } };
+    await writeFile(presetFile, JSON.stringify(presetData));
+
+    try {
+      const { io } = makeIo();
+      const code = await runCli(
+        [
+          '--audio',
+          'song.mp3',
+          '--lyrics',
+          'song.lrc',
+          '--output',
+          'out.mp4',
+          '--preset-file',
+          presetFile,
+        ],
+        io,
+      );
+
+      expect(code).toBe(0);
+      expect(renderVideo).toHaveBeenCalledWith(expect.objectContaining({ presetData }));
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects preset files that do not contain a JSON object', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'karaoke-preset-'));
+    const presetFile = join(directory, 'custom.json');
+    await writeFile(presetFile, '[]');
+
+    try {
+      const { io, stderrText } = makeIo();
+      const code = await runCli(
+        [
+          '--audio',
+          'song.mp3',
+          '--lyrics',
+          'song.lrc',
+          '--output',
+          'out.mp4',
+          '--preset-file',
+          presetFile,
+        ],
+        io,
+      );
+
+      expect(code).toBe(1);
+      expect(stderrText()).toContain('Preset file must contain a JSON object');
+      expect(renderVideo).not.toHaveBeenCalled();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it('exits 1 for an invalid numeric flag value', async () => {

@@ -60,4 +60,43 @@ describe('renderVideo resource cleanup', () => {
     expect(closeServer).toHaveBeenCalledOnce();
     expect(closeOutput).toHaveBeenCalledOnce();
   });
+
+  it('passes a custom preset object to the browser runtime', async () => {
+    const closeOutput = vi.fn().mockResolvedValue(undefined);
+    const closeServer = vi.fn().mockResolvedValue(undefined);
+    const customPreset = { name: 'custom', baseVals: { zoom: 1 } };
+    const page = {
+      on: vi.fn(),
+      exposeFunction: vi.fn(),
+      goto: vi.fn().mockResolvedValue(undefined),
+      waitForFunction: vi.fn().mockResolvedValue(undefined),
+      evaluate: vi.fn().mockResolvedValue(undefined),
+    };
+    mocks.open.mockResolvedValue({ close: closeOutput, write: vi.fn() });
+    mocks.startAssetServer.mockResolvedValue({
+      baseUrl: 'http://127.0.0.1:1234',
+      close: closeServer,
+    });
+    mocks.launch.mockResolvedValue({
+      newPage: vi.fn().mockResolvedValue(page),
+      close: vi.fn().mockResolvedValue(undefined),
+    });
+
+    await renderVideo({
+      audioPath: 'input.wav',
+      assText: '',
+      config: {
+        width: 1920,
+        height: 1080,
+        fps: 24,
+        visualizer: { preset: 'fallback' },
+      },
+      outputPath: 'output.mp4',
+      presetData: customPreset,
+    });
+
+    expect(page.evaluate.mock.calls[0]?.[1]).toMatchObject({ presetData: customPreset });
+    expect(closeServer).toHaveBeenCalledOnce();
+    expect(closeOutput).toHaveBeenCalledOnce();
+  });
 });

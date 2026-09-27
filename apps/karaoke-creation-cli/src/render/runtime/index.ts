@@ -25,6 +25,7 @@ export interface RuntimeOptions {
   height: number;
   fps: number;
   presetName: string;
+  presetData?: Record<string, unknown>;
   /**
    * JASSUB loads its worker/wasm/font assets via relative URLs resolved from its own module
    * location, which esbuild's IIFE bundling breaks; these must point to a real served origin.
@@ -73,6 +74,7 @@ export async function renderKaraoke(options: RuntimeOptions): Promise<void> {
     height,
     fps,
     presetName,
+    presetData,
     jassubWorkerUrl,
     jassubWasmUrl,
     jassubModernWasmUrl,
@@ -130,7 +132,7 @@ export async function renderKaraoke(options: RuntimeOptions): Promise<void> {
 
   const visualizer = butterchurn.createVisualizer(offlineContext, vizCanvas, { width, height });
   visualizer.connectAudio(analyser);
-  const preset = butterchurnPresets[presetName];
+  const preset = presetData ?? butterchurnPresets[presetName];
   if (!preset) {
     throw new Error(`Unknown visualizer preset: ${presetName}`);
   }
@@ -181,7 +183,7 @@ export async function renderKaraoke(options: RuntimeOptions): Promise<void> {
     if (frame % 300 === 0) {
       console.log(`[runtime] rendering frame ${frame}/${totalFrames}`);
     }
-    visualizer.render();
+    visualizer.render({ elapsedTime: 1 / fps });
     // manualRender round-trips to JASSUB's worker before painting subtitleCanvas, so it must be
     // awaited before compositing, or the canvas will still hold the previous (or no) frame.
     await jassub.manualRender({

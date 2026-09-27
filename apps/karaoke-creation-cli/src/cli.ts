@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { loadConfig, mergeConfig } from './core/config.js';
 import { resolveLyricsFileWithDiagnostics } from './core/input.js';
 import { renderVideo } from './render/renderer.js';
@@ -19,6 +20,7 @@ Options:
   --output <file>     Path to write the resulting .mp4 (required)
   --config <file>     Path to a karaoke.config.json overrides file
   --preset <name>     Butterchurn preset name
+  --preset-file <file> Butterchurn preset JSON file (mutually exclusive with --preset)
   --width <number>     Output video width
   --height <number>    Output video height
   --fps <number>      Output video frame rate
@@ -37,6 +39,7 @@ interface ParsedArgs {
   output?: string;
   config?: string;
   preset?: string;
+  presetFile?: string;
   width?: string;
   height?: string;
   fps?: string;
@@ -48,6 +51,7 @@ const FLAG_KEYS: Record<string, keyof ParsedArgs> = {
   '--output': 'output',
   '--config': 'config',
   '--preset': 'preset',
+  '--preset-file': 'presetFile',
   '--width': 'width',
   '--height': 'height',
   '--fps': 'fps',
@@ -81,6 +85,15 @@ function parsePositiveInt(value: string, flag: string): number {
   return n;
 }
 
+async function readPresetFile(path: string): Promise<Record<string, unknown>> {
+  const text = await readFile(path, 'utf8');
+  const preset: unknown = JSON.parse(text);
+  if (typeof preset !== 'object' || preset === null || Array.isArray(preset)) {
+    throw new Error(`Preset file must contain a JSON object: ${path}`);
+  }
+  return preset as Record<string, unknown>;
+}
+
 /** Parses CLI args, renders the karaoke video, and writes it to disk. Returns the process exit code. */
 export async function runCli(
   argv: string[],
@@ -96,7 +109,22 @@ export async function runCli(
     await writeStream(io.stderr, `${result.error}\n${USAGE}`);
     return 1;
   }
-  const { audio, lyrics, output, config: configPath, preset, width, height, fps } = result.parsed;
+  const {
+    audio,
+    lyrics,
+    output,
+    config: configPath,
+    preset,
+    presetFile,
+    width,
+    height,
+    fps,
+  } = result.parsed;
+
+  if (preset !== undefined && presetFile !== undefined) {
+    await writeStream(io.stderr, '--preset and --preset-file cannot be used together\n');
+    return 1;
+  }
 
   const missing = ['audio', 'lyrics', 'output'].filter(
     (key) => result.parsed[key as keyof ParsedArgs] === undefined,
@@ -125,6 +153,7 @@ export async function runCli(
   try {
     const baseConfig = await loadConfig(configPath);
     const config = mergeConfig(baseConfig, overrides);
+    const presetData = presetFile === undefined ? undefined : await readPresetFile(presetFile);
     const { text: assText, diagnostics } = await resolveLyricsFileWithDiagnostics(lyrics as string);
     for (const diagnostic of diagnostics) {
       const location = diagnostic.location
@@ -141,6 +170,7 @@ export async function runCli(
       assText,
       config,
       outputPath: output as string,
+      ...(presetData !== undefined ? { presetData } : {}),
     });
   } catch (error) {
     await writeStream(io.stderr, `Failed to generate karaoke video: ${(error as Error).message}\n`);

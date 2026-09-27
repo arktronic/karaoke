@@ -22,6 +22,7 @@ export interface RenderInputs {
   assText: string;
   config: KaraokeConfig;
   outputPath: string;
+  presetData?: Record<string, unknown>;
 }
 
 function log(message: string): void {
@@ -40,6 +41,7 @@ export async function renderVideo({
   assText,
   config,
   outputPath,
+  presetData,
 }: RenderInputs): Promise<void> {
   const audioBytes = await readFile(audioPath);
   let outputHandle: Awaited<ReturnType<typeof open>> | undefined;
@@ -117,6 +119,7 @@ export async function renderVideo({
         height,
         fps,
         presetName,
+        presetData,
         jassubBaseUrl: jassubUrl,
         jassubWorkerUrl: workerUrl,
       }) =>
@@ -131,6 +134,7 @@ export async function renderVideo({
           height,
           fps,
           presetName,
+          presetData,
           jassubWorkerUrl: workerUrl,
           jassubWasmUrl: `${jassubUrl}/wasm/jassub-worker.wasm`,
           jassubModernWasmUrl: `${jassubUrl}/wasm/jassub-worker-modern.wasm`,
@@ -143,6 +147,7 @@ export async function renderVideo({
         height: config.height,
         fps: config.fps,
         presetName: config.visualizer.preset,
+        presetData,
         jassubBaseUrl,
         jassubWorkerUrl,
       },
