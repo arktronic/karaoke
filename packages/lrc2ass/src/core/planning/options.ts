@@ -311,6 +311,18 @@ export function assertPlanOptions(options: ResolvedPlanOptions): void {
   if (options.interlude.marginMs !== undefined) {
     assertNonNegativeSafeInteger(options.interlude.marginMs, 'interlude.marginMs');
   }
+  if (options.interlude.progressBarY !== undefined) {
+    assertNonNegativeSafeInteger(options.interlude.progressBarY, 'interlude.progressBarY');
+  }
+  if (options.interlude.progressBarHeightPx !== undefined) {
+    assertNonNegativeSafeInteger(
+      options.interlude.progressBarHeightPx,
+      'interlude.progressBarHeightPx',
+    );
+    if (options.interlude.progressBarHeightPx === 0) {
+      throw new RangeError('interlude.progressBarHeightPx must be greater than 0');
+    }
+  }
   if (options.interlude.trailingLyricDurationMs !== undefined) {
     assertNonNegativeSafeInteger(
       options.interlude.trailingLyricDurationMs,
