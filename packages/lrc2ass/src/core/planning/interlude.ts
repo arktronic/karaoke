@@ -57,6 +57,7 @@ export function addInterludeEvents(
         const trackColor = assColorFromHex(interludeStyleOptions.secondaryColor ?? '#808080');
         const fillColor = assColorFromHex(interludeStyleOptions.primaryColor ?? '#FFFFFF');
         const borderColor = assColorFromHex(interludeStyleOptions.outlineColor ?? '#000000');
+        const clipBottom = options.layout.resolutionY;
         events.push({
           layer: 0,
           startMs,
@@ -71,8 +72,8 @@ export function addInterludeEvents(
           style,
           text:
             `{\\p1\\an7\\pos(${barLeft},${barTop})\\shad0\\1c${fillColor}\\3c${borderColor}` +
-            `\\clip(${barLeft},${barTop},${barLeft},${barTop + barHeight})` +
-            `\\t(0,${endMs - startMs},\\clip(${barLeft},${barTop},${barLeft + barWidth},${barTop + barHeight}))}` +
+            `\\clip(${barLeft},0,${barLeft},${clipBottom})` +
+            `\\t(0,${endMs - startMs},\\clip(${barLeft},0,${barLeft + barWidth},${clipBottom}))}` +
             `${path}{\\p0}`,
         });
       } else {

@@ -4,7 +4,7 @@ import type { KaraokeConfig, KaraokeConfigOverrides } from '../types/options.js'
 export const DEFAULT_CONFIG: KaraokeConfig = {
   width: 1920,
   height: 1080,
-  fps: 24,
+  fps: 60,
   visualizer: {
     preset: 'Flexi, martin + geiss - dedicated to the sherwin maxawow',
   },

@@ -1590,11 +1590,17 @@ describe('planEvents', () => {
 
     const document = planEvents(normalized, {
       ...options,
-      interlude: { minGapMs: 3_000, marginMs: 100, strategy: 'progress-bar' },
+      interlude: {
+        minGapMs: 3_000,
+        marginMs: 100,
+        strategy: 'progress-bar',
+        progressBarY: 166,
+        progressBarHeightPx: 24,
+      },
     });
 
     // layout: resolutionX 384, marginLeft/Right 10 -> barLeft 10, barWidth 364; resolutionY 288,
-    // barHeight 24 -> center at 60% canvas height, barTop 161; radius clamps to 8. Single-line preset interlude colors:
+    // barHeight 24, explicit barTop 166; radius clamps to 8. Single-line preset interlude colors:
     // primaryColor #FFFFFF (fill), secondaryColor #808080 (track), outlineColor #000000 (border).
     const path =
       'm 8 0 l 356 0 b 364 0 364 0 364 8 l 364 16 b 364 24 364 24 356 24 l 8 24 ' +
@@ -1615,7 +1621,7 @@ describe('planEvents', () => {
         style: 'Interlude',
         text:
           '{\\p1\\an7\\pos(10,166)\\shad0\\1c&H00FFFFFF&\\3c&H00000000&' +
-          '\\clip(10,166,10,190)\\t(0,3800,\\clip(10,166,374,190))}' +
+          '\\clip(10,0,10,288)\\t(0,3800,\\clip(10,0,374,288))}' +
           `${path}{\\p0}`,
       },
     ]);
@@ -1635,7 +1641,8 @@ describe('planEvents', () => {
     );
     expect(positionedEvents[0]?.text).toContain('\\pos(10,40)');
     expect(positionedEvents[1]?.text).toContain('\\pos(10,40)');
-    expect(positionedEvents[1]?.text).toContain('\\clip(10,40,10,72)');
+    expect(positionedEvents[1]?.text).toContain('\\clip(10,0,10,288)');
+    expect(positionedEvents[1]?.text).toContain('\\clip(10,0,374,288)');
     expect(() =>
       planEvents(normalized, {
         ...options,
