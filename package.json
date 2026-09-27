@@ -6,7 +6,8 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
-    "format": "pnpm -r format"
+    "format": "pnpm -r format",
+    "validate": "pnpm -r format && pnpm -r lint && pnpm -r test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

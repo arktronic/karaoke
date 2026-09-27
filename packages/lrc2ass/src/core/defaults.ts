@@ -20,7 +20,8 @@ export const DEFAULT_PLAN_OPTIONS: PlanOptions = {
     blankGapMs: 3000,
   },
   layout: {
-    resolutionX: 384,
+    // Default 16:9 authoring space for wrap decisions.
+    resolutionX: 512,
     resolutionY: 288,
     alignment: 2,
     marginLeft: 10,

@@ -32,8 +32,29 @@ describe('planEvents', () => {
     expect(document.scriptInfo).toEqual({ playResX: 384, playResY: 288 });
     expect(document.styles.map((style) => style.name)).toEqual(['Lyrics', 'Preview', 'Interlude']);
     expect(document.events).toEqual([
-      { layer: 0, startMs: 20, endMs: 1_040, style: 'Lyrics', text: 'a\\{b\\}\\\\c\\Nd\\Ne\\Nf' },
+      {
+        layer: 0,
+        startMs: 20,
+        endMs: 1_040,
+        style: 'Lyrics',
+        text: '{\\q2}a\\{b\\}\\\\c\\Nd\\Ne\\Nf',
+      },
     ]);
+  });
+
+  it('does not split single-line lyrics to fit an unused preview style', () => {
+    const document = planEvents(
+      { occurrences: [{ startMs: 0, endMs: 1_000, text: 'hello world' }] },
+      {
+        ...options,
+        styles: { preview: { fontSize: 100, marginLeft: 100, marginRight: 100 } },
+      },
+    );
+
+    expect(document.events.filter((event) => event.style === 'Lyrics')).toHaveLength(1);
+    expect(document.events.find((event) => event.style === 'Lyrics')?.text).toBe(
+      '{\\q2}hello world',
+    );
   });
 
   it('preserves base values when overrides are undefined and applies defined layout overrides', () => {
@@ -119,7 +140,11 @@ describe('planEvents', () => {
 
       const [event] = planEvents(normalized, { ...options, karaokeEffect }).events;
 
-      expect(event).toMatchObject({ startMs: 20, endMs: 70, text: `{\\${tag}2}one{\\${tag}3}two` });
+      expect(event).toMatchObject({
+        startMs: 20,
+        endMs: 70,
+        text: `{\\q2}{\\${tag}2}one{\\${tag}3}two`,
+      });
     },
   );
 
@@ -140,7 +165,7 @@ describe('planEvents', () => {
 
     const [event] = planEvents(normalized, { ...options, karaokeEffect: 'sweep' }).events;
 
-    expect(event.text).toBe('{\\kf5}Foo{\\kf5} bar');
+    expect(event.text).toBe('{\\q2}{\\kf5}Foo{\\kf5} bar');
   });
 
   it("keeps a segment's own trailing space as the word separator when the next segment has no leading space", () => {
@@ -162,7 +187,7 @@ describe('planEvents', () => {
 
     // A segment's own trailing space is kept as the word separator when the next segment has no
     // leading space of its own, so adjacent segments don't fuse into one word.
-    expect(event.text).toBe('{\\kf5}Hello {\\kf5}world');
+    expect(event.text).toBe('{\\q2}{\\kf5}Hello {\\kf5}world');
   });
 
   it('encodes a leading enhanced-timestamp delay as an empty karaoke syllable', () => {
@@ -182,7 +207,7 @@ describe('planEvents', () => {
 
     // First line, so its leading gap is always pre-sweep-eligible (no predecessor to compare against).
     expect(event.text).toBe(
-      '{\\kf13}\u00B7{\\kf12}\u00B7{\\kf13}\u00B7{\\kf12}\u00B7 {\\kf150}Hello',
+      '{\\q2}{\\kf13}\u00B7{\\kf12}\u00B7{\\kf13}\u00B7{\\kf12}\u00B7 {\\kf150}Hello',
     );
   });
 
@@ -207,7 +232,7 @@ describe('planEvents', () => {
     // A whitespace-only leading segment is padding, not the first sung word, so its own timeMs (0)
     // is not used as the sung-start reference for pre-sweep gating.
     expect(event.text).toBe(
-      '{\\kf13}\u00B7{\\kf12}\u00B7{\\kf13}\u00B7{\\kf12}\u00B7 {\\kf150}Hello',
+      '{\\q2}{\\kf13}\u00B7{\\kf12}\u00B7{\\kf13}\u00B7{\\kf12}\u00B7 {\\kf150}Hello',
     );
   });
 
@@ -233,7 +258,7 @@ describe('planEvents', () => {
     // first real word still triggers deferral.
     expect(event.startMs).toBe(14_000);
     expect(event.text).toBe(
-      '{\\kf25}\u00B7{\\kf25}\u00B7{\\kf25}\u00B7{\\kf25}\u00B7 {\\kf500}La la la',
+      '{\\q2}{\\kf25}\u00B7{\\kf25}\u00B7{\\kf25}\u00B7{\\kf25}\u00B7 {\\kf500}La la la',
     );
   });
 
@@ -256,7 +281,7 @@ describe('planEvents', () => {
     expect(event.startMs).toBe(14_000);
     // First line, so its leading gap is always pre-sweep-eligible (no predecessor to compare against).
     expect(event.text).toBe(
-      '{\\kf25}\u00B7{\\kf25}\u00B7{\\kf25}\u00B7{\\kf25}\u00B7 {\\kf500}La la la',
+      '{\\q2}{\\kf25}\u00B7{\\kf25}\u00B7{\\kf25}\u00B7{\\kf25}\u00B7 {\\kf500}La la la',
     );
   });
 
@@ -319,7 +344,7 @@ describe('planEvents', () => {
 
     // Gap from First's endMs (1_000) to Second's sung start (2_000) is 1_000ms, meeting mainLinePreRollMs.
     expect(second.text).toBe(
-      '{\\kf25}\u00B7{\\kf25}\u00B7{\\kf25}\u00B7{\\kf25}\u00B7 {\\kf100}Second',
+      '{\\q2}{\\kf25}\u00B7{\\kf25}\u00B7{\\kf25}\u00B7{\\kf25}\u00B7 {\\kf100}Second',
     );
   });
 
@@ -340,7 +365,7 @@ describe('planEvents', () => {
     ).events;
 
     // Gap from First's endMs (1_000) to Second's sung start (1_500) is only 500ms, under mainLinePreRollMs.
-    expect(second.text).toBe('{\\kf50}{\\kf100}Second');
+    expect(second.text).toBe('{\\q2}{\\kf50}{\\kf100}Second');
   });
 
   it('does not show a pre-sweep dot count-in when an earlier, longer-overlapping line is still active', () => {
@@ -367,7 +392,7 @@ describe('planEvents', () => {
 
     // Gap from Second's endMs (2_000) to Third's sung start (8_500) is 6_500ms, meeting
     // mainLinePreRollMs, but First (ending at 10_000) is still active at 8_500, so there's no real gap.
-    expect(third.text).toBe('{\\kf50}{\\kf50}Third');
+    expect(third.text).toBe('{\\q2}{\\kf50}{\\kf50}Third');
   });
 
   it("does not let an occurrence that never becomes visible suppress the next line's pre-sweep", () => {
@@ -484,7 +509,7 @@ describe('planEvents', () => {
 
     // Gap from First's endMs (1_000) to Second's sung start (5_010) is 4_010ms, meeting mainLinePreRollMs,
     // but Second's own leading duration (10ms) is below the 40ms needed for 4 non-zero-duration dots.
-    expect(second.text).toBe('{\\kf1}{\\kf99}Second');
+    expect(second.text).toBe('{\\q2}{\\kf1}{\\kf99}Second');
   });
 
   it("mirrors a line's pre-sweep dot prefix in its own Preview event so text doesn't shift at handoff", () => {
@@ -507,7 +532,7 @@ describe('planEvents', () => {
     });
 
     const preview = document.events.find((event) => event.style === 'Preview');
-    expect(preview?.text).toBe('{\\an8}\u00B7\u00B7\u00B7\u00B7 Second');
+    expect(preview?.text).toBe('{\\an8}{\\q2}\u00B7\u00B7\u00B7\u00B7 Second');
   });
 
   it('does not add a dot prefix to a Preview event when its line has no pre-sweep', () => {
@@ -530,7 +555,7 @@ describe('planEvents', () => {
     });
 
     const preview = document.events.find((event) => event.style === 'Preview');
-    expect(preview?.text).toBe('{\\an8}Second');
+    expect(preview?.text).toBe('{\\an8}{\\q2}Second');
   });
 
   it('does not defer a lyric event start when there is no leading delay', () => {
@@ -567,7 +592,7 @@ describe('planEvents', () => {
       endMs: 2_000,
       style: 'Preview',
       marginVertical: 144,
-      text: '{\\an8}Next',
+      text: '{\\an8}{\\q2}Next',
     });
   });
 
@@ -600,7 +625,7 @@ describe('planEvents', () => {
       endMs: 34_000,
       style: 'Preview',
       marginVertical: 114,
-      text: '{\\an8}\u00B7\u00B7\u00B7\u00B7 La la la',
+      text: '{\\an8}{\\q2}\u00B7\u00B7\u00B7\u00B7 La la la',
     });
   });
 
@@ -624,7 +649,7 @@ describe('planEvents', () => {
         endMs: 2_000,
         style: 'Preview',
         marginVertical: 114,
-        text: '{\\an8}Next line',
+        text: '{\\an8}{\\q2}Next line',
       },
     ]);
     expect(document.events.slice(0, 3).map((event) => event.style)).toEqual([
@@ -634,8 +659,8 @@ describe('planEvents', () => {
     ]);
     // Simultaneous occurrences alternate rows via marginVertical; alignment tag stays the same.
     const [singerOne, singerTwo] = document.events.filter((event) => event.style === 'Lyrics');
-    expect(singerOne.text).toBe('{\\an8}Singer one');
-    expect(singerTwo.text).toBe('{\\an8}Singer two');
+    expect(singerOne.text).toBe('{\\an8}{\\q2}Singer one');
+    expect(singerTwo.text).toBe('{\\an8}{\\q2}Singer two');
     expect(singerOne.marginVertical).not.toBe(singerTwo.marginVertical);
   });
 
@@ -653,9 +678,9 @@ describe('planEvents', () => {
     const lyricEvents = document.events.filter((event) => event.style === 'Lyrics');
     // Every row shares the same alignment tag; only the per-event MarginV distinguishes rows.
     expect(lyricEvents.map((event) => event.text)).toEqual([
-      '{\\an8}First',
-      '{\\an8}Second',
-      '{\\an8}Third',
+      '{\\an8}{\\q2}First',
+      '{\\an8}{\\q2}Second',
+      '{\\an8}{\\q2}Third',
     ]);
     expect(lyricEvents.map((event) => event.marginVertical)).toEqual([114, 144, 114]);
   });
@@ -722,7 +747,7 @@ describe('planEvents', () => {
     const document = planEvents(normalized, { ...options, preset: 'single-line' });
 
     expect(document.events).toEqual([
-      { layer: 0, startMs: 0, endMs: 1_000, style: 'Lyrics', text: 'Solo' },
+      { layer: 0, startMs: 0, endMs: 1_000, style: 'Lyrics', text: '{\\q2}Solo' },
     ]);
   });
 
@@ -827,10 +852,10 @@ describe('planEvents', () => {
     expect(
       lyricEvents.map((event) => ({ text: event.text, marginVertical: event.marginVertical })),
     ).toEqual([
-      { text: '{\\an8}First', marginVertical: 84 },
-      { text: '{\\an8}Second', marginVertical: 114 },
-      { text: '{\\an8}Third', marginVertical: 144 },
-      { text: '{\\an8}Fourth', marginVertical: 174 },
+      { text: '{\\an8}{\\q2}First', marginVertical: 84 },
+      { text: '{\\an8}{\\q2}Second', marginVertical: 114 },
+      { text: '{\\an8}{\\q2}Third', marginVertical: 144 },
+      { text: '{\\an8}{\\q2}Fourth', marginVertical: 174 },
     ]);
   });
 
@@ -860,7 +885,7 @@ describe('planEvents', () => {
         endMs: 1_000,
         style: 'Preview',
         marginVertical: 129,
-        text: '{\\an8}Second',
+        text: '{\\an8}{\\q2}Second',
       },
       {
         layer: -1,
@@ -868,7 +893,7 @@ describe('planEvents', () => {
         endMs: 2_000,
         style: 'Preview',
         marginVertical: 159,
-        text: '{\\an8}Third',
+        text: '{\\an8}{\\q2}Third',
       },
     ]);
   });
@@ -895,7 +920,11 @@ describe('planEvents', () => {
     const previewTexts = document.events
       .filter((event) => event.style === 'Preview' && event.startMs === 0)
       .map((event) => event.text);
-    expect(previewTexts).toEqual(['{\\an8}Second', '{\\an8}Third', '{\\an8}Fourth']);
+    expect(previewTexts).toEqual([
+      '{\\an8}{\\q2}Second',
+      '{\\an8}{\\q2}Third',
+      '{\\an8}{\\q2}Fourth',
+    ]);
   });
 
   it('delays a preview until its row frees up from its same-row predecessor', () => {
@@ -948,7 +977,7 @@ describe('planEvents', () => {
         endMs: 5_000,
         style: 'Preview',
         marginVertical: 114,
-        text: '{\\an8}Second',
+        text: '{\\an8}{\\q2}Second',
       },
     ]);
 
@@ -1365,7 +1394,7 @@ describe('planEvents', () => {
     });
 
     expect(document.events).toEqual([
-      { layer: 0, startMs: 0, endMs: 1_000, style: 'Lyrics', text: '{\\fad(200,300)}Solo' },
+      { layer: 0, startMs: 0, endMs: 1_000, style: 'Lyrics', text: '{\\fad(200,300)}{\\q2}Solo' },
     ]);
   });
 
@@ -1383,7 +1412,7 @@ describe('planEvents', () => {
 
     // fadeInMs + fadeOutMs (800) exceeds the 500ms event duration, so both are scaled by 500/800 = 0.625.
     expect(document.events).toEqual([
-      { layer: 0, startMs: 0, endMs: 500, style: 'Lyrics', text: '{\\fad(250,250)}Short' },
+      { layer: 0, startMs: 0, endMs: 500, style: 'Lyrics', text: '{\\fad(250,250)}{\\q2}Short' },
     ]);
   });
 
@@ -1402,7 +1431,7 @@ describe('planEvents', () => {
     // fadeInMs + fadeOutMs (400) scales by 10/400 = 0.025 to 2.5/7.5; rounding each independently
     // would give fad(3,8) (sum 11 > the 10ms event duration), so fadeOutMs is derived as 10 - 3 = 7.
     expect(document.events).toEqual([
-      { layer: 0, startMs: 0, endMs: 10, style: 'Lyrics', text: '{\\fad(3,7)}Tiny' },
+      { layer: 0, startMs: 0, endMs: 10, style: 'Lyrics', text: '{\\fad(3,7)}{\\q2}Tiny' },
     ]);
   });
 
@@ -1414,7 +1443,7 @@ describe('planEvents', () => {
     const document = planEvents(normalized, { ...options, preset: 'single-line' });
 
     expect(document.events).toEqual([
-      { layer: 0, startMs: 0, endMs: 1_000, style: 'Lyrics', text: 'Solo' },
+      { layer: 0, startMs: 0, endMs: 1_000, style: 'Lyrics', text: '{\\q2}Solo' },
     ]);
   });
 
@@ -1652,7 +1681,7 @@ describe('planEvents', () => {
       startMs: 0,
       endMs: 6_500,
       style: 'Lyrics',
-      text: 'First line',
+      text: '{\\q2}First line',
     });
     expect(document.events).toContainEqual({
       layer: 0,
@@ -1661,6 +1690,29 @@ describe('planEvents', () => {
       style: 'Interlude',
       text: '♪ Instrumental ♪',
     });
+  });
+
+  it('leaves an overlong plain lyric on one no-wrap line without changing its timing', () => {
+    const text = 'word '.repeat(30).trim();
+    const normalized: NormalizedLyrics = {
+      occurrences: [{ startMs: 0, endMs: 100_000, text }],
+    };
+
+    const document = planEvents(normalized, {
+      ...options,
+      interlude: { minGapMs: 1_000, strategy: 'text' },
+    });
+    const lyricEvents = document.events.filter((event) => event.style === 'Lyrics');
+
+    expect(lyricEvents).toHaveLength(1);
+    expect(lyricEvents[0]).toEqual({
+      layer: 0,
+      startMs: 0,
+      endMs: 100_000,
+      style: 'Lyrics',
+      text: `{\\q2}${text}`,
+    });
+    expect(document.events.filter((event) => event.style === 'Interlude')).toEqual([]);
   });
 
   it('does not truncate the final lyric with trailingLyricDurationMs when no lyric follows', () => {
@@ -1688,7 +1740,7 @@ describe('planEvents', () => {
       startMs: 0,
       endMs: 20_000,
       style: 'Lyrics',
-      text: 'Last line',
+      text: '{\\q2}Last line',
     });
   });
 
@@ -1714,7 +1766,7 @@ describe('planEvents', () => {
     });
 
     const second = document.events.find(
-      (event) => event.style === 'Lyrics' && event.text === 'Second',
+      (event) => event.style === 'Lyrics' && event.text === '{\\q2}Second',
     );
     expect(second?.endMs).toBe(1_500);
   });
@@ -1739,7 +1791,7 @@ describe('planEvents', () => {
     });
 
     const first = document.events.find(
-      (event) => event.style === 'Lyrics' && event.text === 'First',
+      (event) => event.style === 'Lyrics' && event.text === '{\\q2}First',
     );
     expect(first?.endMs).toBe(10_000);
   });
@@ -1765,10 +1817,10 @@ describe('planEvents', () => {
     });
 
     const first = document.events.find(
-      (event) => event.style === 'Lyrics' && event.text === 'First',
+      (event) => event.style === 'Lyrics' && event.text === '{\\q2}First',
     );
     const collapsed = document.events.find(
-      (event) => event.style === 'Lyrics' && event.text === 'Collapsed',
+      (event) => event.style === 'Lyrics' && event.text === '{\\q2}Collapsed',
     );
     expect(collapsed).toBeUndefined();
     expect(first?.endMs).toBe(5_000);
@@ -1790,8 +1842,8 @@ describe('planEvents', () => {
       interlude: { minGapMs: 1_000, strategy: 'text', trailingLyricDurationMs: 500 },
     });
 
-    const a = document.events.find((event) => event.style === 'Lyrics' && event.text === 'A');
-    const b = document.events.find((event) => event.style === 'Lyrics' && event.text === 'B');
+    const a = document.events.find((event) => event.style === 'Lyrics' && event.text === '{\\q2}A');
+    const b = document.events.find((event) => event.style === 'Lyrics' && event.text === '{\\q2}B');
     expect(a?.endMs).toBe(500);
     expect(b?.endMs).toBe(500);
   });
@@ -1822,7 +1874,7 @@ describe('planEvents', () => {
       startMs: 0,
       endMs: 10_000,
       style: 'Lyrics',
-      text: 'First line',
+      text: '{\\q2}First line',
     });
   });
 
@@ -1857,7 +1909,7 @@ describe('planEvents', () => {
       startMs: 0,
       endMs: 7_000,
       style: 'Lyrics',
-      text: 'First line',
+      text: '{\\q2}First line',
     });
     expect(document.events.filter((event) => event.style === 'Interlude')).toEqual([]);
   });
@@ -1890,7 +1942,7 @@ describe('planEvents', () => {
       startMs: 0,
       endMs: 1_020,
       style: 'Lyrics',
-      text: 'First',
+      text: '{\\q2}First',
     });
     expect(document.events.filter((event) => event.style === 'Interlude')).toEqual([]);
   });

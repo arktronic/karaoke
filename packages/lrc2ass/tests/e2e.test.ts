@@ -14,14 +14,14 @@ describe('convert end-to-end', () => {
     expect(result.text).toContain('[V4+ Styles]\r\n');
     expect(result.text).toContain('[Events]\r\n');
     expect(result.text).toContain(
-      'Dialogue: 0,0:00:00.00,0:00:02.00,Lyrics,,0,0,84,,{\\an8}Hello world',
+      'Dialogue: 0,0:00:00.00,0:00:02.00,Lyrics,,0,0,84,,{\\an8}{\\q2}Hello world',
     );
     expect(result.text).toContain(
-      'Dialogue: 0,0:00:02.00,0:00:07.00,Lyrics,,0,0,114,,{\\an8}Second line',
+      'Dialogue: 0,0:00:02.00,0:00:07.00,Lyrics,,0,0,114,,{\\an8}{\\q2}Second line',
     );
     // Default multi-line preset emits a Preview Dialogue event for the upcoming line.
     expect(result.text).toContain(
-      'Dialogue: -1,0:00:00.00,0:00:02.00,Preview,,0,0,114,,{\\an8}Second line',
+      'Dialogue: -1,0:00:00.00,0:00:02.00,Preview,,0,0,114,,{\\an8}{\\q2}Second line',
     );
     expect(result.text.endsWith('\r\n')).toBe(true);
   });
@@ -62,13 +62,13 @@ describe('convert end-to-end', () => {
     // First line has no preceding preview, so it gets a full fade-in; its preview of "Second"
     // hands off seamlessly into "Second" becoming current, so no fade plays at that boundary.
     expect(result.text).toContain(
-      'Dialogue: 0,0:00:00.00,0:00:02.00,Lyrics,,0,0,84,,{\\fad(150,300)}{\\an8}First',
+      'Dialogue: 0,0:00:00.00,0:00:02.00,Lyrics,,0,0,84,,{\\fad(150,300)}{\\an8}{\\q2}First',
     );
     expect(result.text).toContain(
-      'Dialogue: -1,0:00:00.00,0:00:02.00,Preview,,0,0,114,,{\\fad(150,0)}{\\an8}Second',
+      'Dialogue: -1,0:00:00.00,0:00:02.00,Preview,,0,0,114,,{\\fad(150,0)}{\\an8}{\\q2}Second',
     );
     expect(result.text).toContain(
-      'Dialogue: 0,0:00:02.00,0:00:07.00,Lyrics,,0,0,114,,{\\fad(0,300)}{\\an8}Second',
+      'Dialogue: 0,0:00:02.00,0:00:07.00,Lyrics,,0,0,114,,{\\fad(0,300)}{\\an8}{\\q2}Second',
     );
   });
 
@@ -78,11 +78,13 @@ describe('convert end-to-end', () => {
     });
 
     expect(result.text).toContain(
-      'Dialogue: -1,0:00:00.00,0:00:02.00,Preview,,0,0,114,,{\\an8}Second',
+      'Dialogue: -1,0:00:00.00,0:00:02.00,Preview,,0,0,114,,{\\an8}{\\q2}Second',
     );
-    expect(result.text).toContain('Dialogue: 0,0:00:00.00,0:00:02.00,Lyrics,,0,0,84,,{\\an8}First');
     expect(result.text).toContain(
-      'Dialogue: 0,0:00:02.00,0:00:07.00,Lyrics,,0,0,114,,{\\an8}Second',
+      'Dialogue: 0,0:00:00.00,0:00:02.00,Lyrics,,0,0,84,,{\\an8}{\\q2}First',
+    );
+    expect(result.text).toContain(
+      'Dialogue: 0,0:00:02.00,0:00:07.00,Lyrics,,0,0,114,,{\\an8}{\\q2}Second',
     );
   });
 
@@ -102,7 +104,7 @@ describe('convert end-to-end', () => {
     // The ~59s gap is a genuine full blank (no lingering configured here to bridge it), so "Second"
     // resets to the top row instead of continuing the raw rotation to row 1.
     expect(result.text).toContain(
-      'Dialogue: 0,0:01:00.00,0:01:05.00,Lyrics,,0,0,84,,{\\an8}Second',
+      'Dialogue: 0,0:01:00.00,0:01:05.00,Lyrics,,0,0,84,,{\\an8}{\\q2}Second',
     );
   });
 
@@ -148,7 +150,7 @@ describe('convert end-to-end', () => {
 
     // The malformed line is stored as an unknown entry, not turned into a Dialogue event.
     expect(result.text).toContain(
-      'Dialogue: 0,0:00:00.00,0:00:05.00,Lyrics,,0,0,84,,{\\an8}Good line',
+      'Dialogue: 0,0:00:00.00,0:00:05.00,Lyrics,,0,0,84,,{\\an8}{\\q2}Good line',
     );
     expect(result.text).not.toContain('bad line here');
   });

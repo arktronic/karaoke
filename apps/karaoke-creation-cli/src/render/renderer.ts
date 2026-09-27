@@ -1,0 +1,188 @@
+import { open, readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { chromium } from 'playwright';
+import { startAssetServer, type AssetServer } from './server.js';
+import type { KaraokeConfig } from '../types/options.js';
+
+const APP_DIST_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
+const JASSUB_DIST_DIR = join(
+  dirname(createRequire(import.meta.url).resolve('jassub/package.json')),
+  'dist',
+);
+
+// Served at "/"; loads the bundled runtime as a real <script src>, giving it a proper origin so
+// JASSUB's explicit worker/wasm URLs (below) can be resolved and fetched.
+const INDEX_HTML =
+  '<!doctype html><html><head></head><body><script src="/dist/runtime.js"></script></body></html>';
+
+export interface RenderInputs {
+  audioPath: string;
+  assText: string;
+  config: KaraokeConfig;
+  outputPath: string;
+  presetData?: Record<string, unknown>;
+}
+
+function log(message: string): void {
+  process.stderr.write(`[renderer] ${message}\n`);
+}
+
+function gpuAngleBackend(): string {
+  if (process.platform === 'win32') return 'd3d11';
+  if (process.platform === 'darwin') return 'metal';
+  return 'gl';
+}
+
+/** Launches headless Chromium with GPU acceleration requested and streams video to `outputPath`. */
+export async function renderVideo({
+  audioPath,
+  assText,
+  config,
+  outputPath,
+  presetData,
+}: RenderInputs): Promise<void> {
+  const audioBytes = await readFile(audioPath);
+  let outputHandle: Awaited<ReturnType<typeof open>> | undefined;
+  let server: AssetServer | undefined;
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  let renderFailed = false;
+  let cleanupError: AggregateError | undefined;
+
+  try {
+    const openedOutput = await open(outputPath, 'w');
+    outputHandle = openedOutput;
+
+    log('starting asset server');
+    const assetServer = await startAssetServer(
+      [
+        { prefix: '/dist', dir: APP_DIST_DIR },
+        { prefix: '/jassub', dir: JASSUB_DIST_DIR },
+      ],
+      INDEX_HTML,
+    );
+    server = assetServer;
+    log(`asset server listening at ${assetServer.baseUrl}`);
+
+    log('launching chromium');
+    // Use unified headless Chromium (not Playwright's separate headless shell) so ANGLE can use
+    // the selected hardware backend for WebGL without displaying a browser window.
+    const launchedBrowser = await chromium.launch({
+      headless: true,
+      channel: 'chromium',
+      args: [
+        `--use-angle=${gpuAngleBackend()}`,
+        '--ignore-gpu-blocklist',
+        '--enable-gpu-rasterization',
+      ],
+    });
+    browser = launchedBrowser;
+
+    const page = await launchedBrowser.newPage();
+    page.on('console', (msg) => log(`[browser:${msg.type()}] ${msg.text()}`));
+    page.on('pageerror', (error) => log(`[browser:pageerror] ${error}`));
+    page.on('requestfailed', (request) =>
+      log(`[browser:requestfailed] ${request.url()} ${request.failure()?.errorText}`),
+    );
+    page.on('response', (response) => {
+      if (!response.ok()) {
+        log(`[browser:badresponse] ${response.status()} ${response.url()}`);
+      }
+    });
+    page.on('worker', (worker) => {
+      log(`[browser:worker created] ${worker.url()}`);
+    });
+
+    // Streams encoded MP4 chunks straight to disk as they're produced, avoiding both an in-memory
+    // buffer of the whole file and a base64 return value that could exceed the page's max string length.
+    await page.exposeFunction('__writeChunk', async (base64: string, position: number) => {
+      const buffer = Buffer.from(base64, 'base64');
+      await openedOutput.write(buffer, 0, buffer.length, position);
+    });
+
+    log(`navigating to ${assetServer.baseUrl}/`);
+    await page.goto(`${assetServer.baseUrl}/`);
+    log('waiting for __renderKaraoke to be defined');
+    await page.waitForFunction(
+      () => typeof (globalThis as { __renderKaraoke?: unknown }).__renderKaraoke === 'function',
+    );
+    log('runtime script loaded, invoking __renderKaraoke');
+
+    const jassubBaseUrl = `${assetServer.baseUrl}/jassub`;
+    const jassubWorkerUrl = `${assetServer.baseUrl}/dist/jassub-worker.js`;
+    await page.evaluate(
+      ({
+        audioBase64,
+        assText: ass,
+        width,
+        height,
+        fps,
+        presetName,
+        presetData,
+        jassubBaseUrl: jassubUrl,
+        jassubWorkerUrl: workerUrl,
+      }) =>
+        // `window.__renderKaraoke` is attached by the bundled runtime script; this file's tsconfig
+        // has no DOM lib, so it's accessed via globalThis rather than the typed `window` global.
+        (
+          globalThis as unknown as { __renderKaraoke: (options: unknown) => Promise<void> }
+        ).__renderKaraoke({
+          audioBase64,
+          assText: ass,
+          width,
+          height,
+          fps,
+          presetName,
+          presetData,
+          jassubWorkerUrl: workerUrl,
+          jassubWasmUrl: `${jassubUrl}/wasm/jassub-worker.wasm`,
+          jassubModernWasmUrl: `${jassubUrl}/wasm/jassub-worker-modern.wasm`,
+          jassubFontUrl: `${jassubUrl}/default.woff2`,
+        }),
+      {
+        audioBase64: audioBytes.toString('base64'),
+        assText,
+        width: config.width,
+        height: config.height,
+        fps: config.fps,
+        presetName: config.visualizer.preset,
+        presetData,
+        jassubBaseUrl,
+        jassubWorkerUrl,
+      },
+    );
+
+    log('__renderKaraoke resolved');
+  } catch (error) {
+    renderFailed = true;
+    throw error;
+  } finally {
+    log('closing browser, asset server, and output file');
+    const cleanups: Array<() => Promise<void> | undefined> = [];
+    if (browser) cleanups.push(() => browser!.close());
+    if (server) cleanups.push(() => server!.close());
+    if (outputHandle) cleanups.push(() => outputHandle!.close());
+
+    const cleanupErrors: unknown[] = [];
+    for (const cleanup of cleanups) {
+      try {
+        await cleanup();
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
+    if (cleanupErrors.length > 0) {
+      const error = new AggregateError(cleanupErrors, 'Failed to clean up renderer resources');
+      if (renderFailed) {
+        log(error.message);
+      } else {
+        cleanupError = error;
+      }
+    }
+  }
+
+  if (cleanupError) {
+    throw cleanupError;
+  }
+}

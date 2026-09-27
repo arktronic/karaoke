@@ -25,7 +25,7 @@ describe('ESM loading', () => {
     expect(result.diagnostics).toEqual([]);
     expect(result.text).toContain('[Script Info]\r\n');
     expect(result.text).toContain(
-      'Dialogue: 0,0:00:00.00,0:00:05.00,Lyrics,,0,0,84,,{\\an8}Hello world',
+      'Dialogue: 0,0:00:00.00,0:00:05.00,Lyrics,,0,0,84,,{\\an8}{\\q2}Hello world',
     );
   });
 });
