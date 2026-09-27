@@ -167,6 +167,36 @@ describe('runCli', () => {
     expect(renderVideo).not.toHaveBeenCalled();
   });
 
+  it('loads plan options from config and passes them to LRC conversion', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'karaoke-config-'));
+    const configPath = join(directory, 'karaoke.config.json');
+    const plan = { layout: { resolutionX: 1280, resolutionY: 720 } };
+    await writeFile(configPath, JSON.stringify({ plan }));
+
+    try {
+      const { io } = makeIo();
+      const code = await runCli(
+        [
+          '--audio',
+          'song.mp3',
+          '--lyrics',
+          'song.lrc',
+          '--output',
+          'out.mp4',
+          '--config',
+          configPath,
+        ],
+        io,
+      );
+
+      expect(code).toBe(0);
+      expect(resolveLyricsFileWithDiagnostics).toHaveBeenCalledWith('song.lrc', plan);
+      expect(renderVideo).toHaveBeenCalledOnce();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it('reports warning diagnostics and continues rendering', async () => {
     vi.mocked(resolveLyricsFileWithDiagnostics).mockResolvedValue({
       text: '[Script Info]\n',

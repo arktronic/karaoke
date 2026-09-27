@@ -18,7 +18,7 @@ Options:
   --audio <file>     Path to the audio file (required)
   --lyrics <file>     Path to the .lrc or .ass lyrics file (required)
   --output <file>     Path to write the resulting .mp4 (required)
-  --config <file>     Path to a karaoke.config.json overrides file
+  --config <file>     Path to a karaoke.config.json overrides file (includes lrc2ass plan overrides for LRC input)
   --preset <name>     Butterchurn preset name
   --preset-file <file> Butterchurn preset JSON file (mutually exclusive with --preset)
   --width <number>     Output video width
@@ -154,7 +154,10 @@ export async function runCli(
     const baseConfig = await loadConfig(configPath);
     const config = mergeConfig(baseConfig, overrides);
     const presetData = presetFile === undefined ? undefined : await readPresetFile(presetFile);
-    const { text: assText, diagnostics } = await resolveLyricsFileWithDiagnostics(lyrics as string);
+    const { text: assText, diagnostics } = await resolveLyricsFileWithDiagnostics(
+      lyrics as string,
+      config.plan,
+    );
     for (const diagnostic of diagnostics) {
       const location = diagnostic.location
         ? ` (${diagnostic.location.line}:${diagnostic.location.column})`

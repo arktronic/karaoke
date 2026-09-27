@@ -1,3 +1,5 @@
+import type { PlanOverrideOptions } from 'lrc2ass';
+
 export interface VisualizerConfig {
   /** Name of the butterchurn-presets preset to load. */
   preset: string;
@@ -8,12 +10,12 @@ export interface KaraokeConfig {
   height: number;
   fps: number;
   visualizer: VisualizerConfig;
+  /** lrc2ass planner overrides applied when the input lyrics are LRC. */
+  plan?: PlanOverrideOptions;
 }
 
-export type KaraokeConfigOverrides = {
-  [K in keyof KaraokeConfig]?: KaraokeConfig[K] extends object
-    ? Partial<KaraokeConfig[K]>
-    : KaraokeConfig[K];
+export type KaraokeConfigOverrides = Omit<Partial<KaraokeConfig>, 'visualizer'> & {
+  visualizer?: Partial<VisualizerConfig>;
 };
 
 export interface CreateVideoOptions {

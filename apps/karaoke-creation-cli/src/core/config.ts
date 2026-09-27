@@ -19,6 +19,7 @@ export function mergeConfig(
     return base;
   }
 
+  const plan = overrides.plan ?? base.plan;
   return {
     width: overrides.width ?? base.width,
     height: overrides.height ?? base.height,
@@ -26,6 +27,7 @@ export function mergeConfig(
     visualizer: {
       preset: overrides.visualizer?.preset ?? base.visualizer.preset,
     },
+    ...(plan === undefined ? {} : { plan }),
   };
 }
 
@@ -43,6 +45,11 @@ function validateConfigOverrides(value: unknown): asserts value is KaraokeConfig
     ) {
       throw new Error(`Config ${key} must be a positive safe integer`);
     }
+  }
+
+  const plan = overrides.plan;
+  if (plan !== undefined && (typeof plan !== 'object' || plan === null || Array.isArray(plan))) {
+    throw new Error('Config plan must be a JSON object');
   }
 
   const visualizer = overrides.visualizer;

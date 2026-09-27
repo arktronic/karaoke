@@ -10,6 +10,14 @@ describe('resolveAssText', () => {
     expect(result).toContain('[Events]');
   });
 
+  it('applies planner overrides while converting LRC text', () => {
+    const result = resolveAssTextWithDiagnostics(SAMPLE_LRC, '.lrc', {
+      layout: { resolutionX: 1280, resolutionY: 720 },
+    });
+
+    expect(result.text).toContain('PlayResX: 1280\r\nPlayResY: 720');
+  });
+
   it('preserves conversion diagnostics for malformed .lrc text', () => {
     const result = resolveAssTextWithDiagnostics('[00:01.2]Bad', '.lrc');
     expect(result.text).toContain('[Events]');
@@ -23,6 +31,13 @@ describe('resolveAssText', () => {
   it('passes .ass text through unchanged', () => {
     const assText = '[Script Info]\nPlayResX: 1920\n';
     expect(resolveAssText(assText, '.ass')).toBe(assText);
+  });
+
+  it('does not apply planner overrides to existing ASS text', () => {
+    const assText = '[Script Info]\nPlayResX: 1920\n';
+    expect(
+      resolveAssText(assText, '.ass', { layout: { resolutionX: 1280, resolutionY: 720 } }),
+    ).toBe(assText);
   });
 
   it('is case-insensitive on extension', () => {
