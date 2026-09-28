@@ -7,6 +7,7 @@ import type {
   PlanStylesOptions,
 } from '../../types/index.js';
 import { assColorFromHex } from '../color.js';
+import { DEFAULT_PROGRESS_BAR_HEIGHT_PX, DEFAULT_PROGRESS_BAR_Y_PX } from '../defaults.js';
 
 /** Hard cap on maxPreviewLines; keeps the multi-line preset's row stack to a sane, readable size. */
 export const MAX_PREVIEW_LINES_CAP = 8;
@@ -368,6 +369,19 @@ export function assertPlanOptions(options: ResolvedPlanOptions): void {
   }
   if (!['none', 'text', 'countdown', 'progress-bar'].includes(options.interlude.strategy)) {
     throw new RangeError(`interlude.strategy is invalid: ${String(options.interlude.strategy)}`);
+  }
+  if (options.interlude.strategy === 'progress-bar') {
+    const progressBarY = options.interlude.progressBarY ?? DEFAULT_PROGRESS_BAR_Y_PX;
+    const progressBarHeight = Math.min(
+      options.interlude.progressBarHeightPx ?? DEFAULT_PROGRESS_BAR_HEIGHT_PX,
+      options.layout.resolutionY,
+    );
+    if (progressBarY + progressBarHeight > options.layout.resolutionY) {
+      throw new RangeError(
+        `interlude.progressBarY + progress bar height must be <= layout.resolutionY, received ` +
+          `${progressBarY} + ${progressBarHeight} > ${options.layout.resolutionY}`,
+      );
+    }
   }
   if (
     options.interlude.style !== undefined &&

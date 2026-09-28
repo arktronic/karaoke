@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planEvents } from '../src/index.js';
+import { DEFAULT_PLAN_OPTIONS, planEvents } from '../src/index.js';
 import type { NormalizedLyrics, PlanOptions, PlanOverrideOptions } from '../src/index.js';
 
 const options: PlanOptions = {
@@ -1672,6 +1672,38 @@ describe('planEvents', () => {
         },
       }),
     ).toThrow(RangeError);
+  });
+
+  it('rejects progress bars that extend beyond the effective canvas', () => {
+    expect(() =>
+      planEvents({ occurrences: [] }, DEFAULT_PLAN_OPTIONS, {
+        preset: 'single-line',
+        layout: { resolutionY: 384 },
+      }),
+    ).toThrow(RangeError);
+
+    expect(() =>
+      planEvents(
+        { occurrences: [] },
+        { ...options, preset: 'single-line' },
+        {
+          interlude: {
+            minGapMs: 3_000,
+            strategy: 'progress-bar',
+            progressBarY: 260,
+            progressBarHeightPx: 30,
+          },
+        },
+      ),
+    ).toThrow(RangeError);
+
+    expect(() =>
+      planEvents({ occurrences: [] }, DEFAULT_PLAN_OPTIONS, {
+        preset: 'single-line',
+        layout: { resolutionY: 384 },
+        interlude: { minGapMs: 8_000, strategy: 'text' },
+      }),
+    ).not.toThrow();
   });
 
   it('adds an interlude for a leading gap before the very first lyric', () => {
