@@ -57,7 +57,7 @@ function validateConfigOverrides(value: unknown): asserts value is KaraokeConfig
       resolveAndValidatePlanOptions(DEFAULT_PLAN_OPTIONS, plan);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Config plan is invalid: ${message}`);
+      throw new Error(`Config plan is invalid: ${message}`, { cause: error });
     }
   }
 
