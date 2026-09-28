@@ -7,6 +7,7 @@ import type {
   PlanStylesOptions,
 } from '../../types/index.js';
 import { assColorFromHex } from '../color.js';
+import { DEFAULT_PROGRESS_BAR_HEIGHT_PX, DEFAULT_PROGRESS_BAR_Y_PX } from '../defaults.js';
 
 /** Hard cap on maxPreviewLines; keeps the multi-line preset's row stack to a sane, readable size. */
 export const MAX_PREVIEW_LINES_CAP = 8;
@@ -192,7 +193,10 @@ export function assertAlignment(value: number, name: string): void {
 }
 
 function assertStyleOptions(styles: PlanStyleOptions, role: string): void {
-  if (styles.fontName !== undefined && !/^[^,\r\n]+$/.test(styles.fontName)) {
+  if (
+    styles.fontName !== undefined &&
+    (typeof styles.fontName !== 'string' || !/^[^,\r\n]+$/.test(styles.fontName))
+  ) {
     throw new RangeError(
       `${role}.fontName must be non-empty and cannot contain commas or line breaks`,
     );
@@ -228,7 +232,38 @@ function assertStyleOptions(styles: PlanStyleOptions, role: string): void {
   }
   for (const color of ['primaryColor', 'secondaryColor', 'outlineColor', 'backColor'] as const) {
     if (styles[color] !== undefined) {
+      if (typeof styles[color] !== 'string') {
+        throw new RangeError(`${role}.${color} must be a hex color string`);
+      }
       assColorFromHex(styles[color]);
+    }
+  }
+}
+
+function assertJsonObject(value: unknown, name: string): asserts value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new TypeError(`${name} must be a JSON object`);
+  }
+}
+
+function assertPlanOverrideShape(value: unknown): asserts value is PlanOverrideOptions | undefined {
+  if (value === undefined) {
+    return;
+  }
+
+  assertJsonObject(value, 'plan');
+  if (value.layout !== undefined) {
+    assertJsonObject(value.layout, 'plan.layout');
+  }
+  if (value.interlude !== undefined) {
+    assertJsonObject(value.interlude, 'plan.interlude');
+  }
+  if (value.styles !== undefined) {
+    assertJsonObject(value.styles, 'plan.styles');
+    for (const role of ['lyrics', 'preview', 'interlude'] as const) {
+      if (value.styles[role] !== undefined) {
+        assertJsonObject(value.styles[role], `plan.styles.${role}`);
+      }
     }
   }
 }
@@ -311,6 +346,18 @@ export function assertPlanOptions(options: ResolvedPlanOptions): void {
   if (options.interlude.marginMs !== undefined) {
     assertNonNegativeSafeInteger(options.interlude.marginMs, 'interlude.marginMs');
   }
+  if (options.interlude.progressBarY !== undefined) {
+    assertNonNegativeSafeInteger(options.interlude.progressBarY, 'interlude.progressBarY');
+  }
+  if (options.interlude.progressBarHeightPx !== undefined) {
+    assertNonNegativeSafeInteger(
+      options.interlude.progressBarHeightPx,
+      'interlude.progressBarHeightPx',
+    );
+    if (options.interlude.progressBarHeightPx === 0) {
+      throw new RangeError('interlude.progressBarHeightPx must be greater than 0');
+    }
+  }
   if (options.interlude.trailingLyricDurationMs !== undefined) {
     assertNonNegativeSafeInteger(
       options.interlude.trailingLyricDurationMs,
@@ -323,9 +370,35 @@ export function assertPlanOptions(options: ResolvedPlanOptions): void {
   if (!['none', 'text', 'countdown', 'progress-bar'].includes(options.interlude.strategy)) {
     throw new RangeError(`interlude.strategy is invalid: ${String(options.interlude.strategy)}`);
   }
-  if (options.interlude.style !== undefined && !/^[^,\r\n]+$/.test(options.interlude.style)) {
+  if (options.interlude.strategy === 'progress-bar') {
+    const progressBarY = options.interlude.progressBarY ?? DEFAULT_PROGRESS_BAR_Y_PX;
+    const progressBarHeight = Math.min(
+      options.interlude.progressBarHeightPx ?? DEFAULT_PROGRESS_BAR_HEIGHT_PX,
+      options.layout.resolutionY,
+    );
+    if (progressBarY + progressBarHeight > options.layout.resolutionY) {
+      throw new RangeError(
+        `interlude.progressBarY + progress bar height must be <= layout.resolutionY, received ` +
+          `${progressBarY} + ${progressBarHeight} > ${options.layout.resolutionY}`,
+      );
+    }
+  }
+  if (
+    options.interlude.style !== undefined &&
+    (typeof options.interlude.style !== 'string' || !/^[^,\r\n]+$/.test(options.interlude.style))
+  ) {
     throw new RangeError(
       'interlude.style must be non-empty and cannot contain commas or line breaks',
     );
   }
+}
+
+export function resolveAndValidatePlanOptions(
+  baseOptions: PlanOptions,
+  overrides: unknown,
+): ResolvedPlanOptions {
+  assertPlanOverrideShape(overrides);
+  const options = resolvePlanOptions(baseOptions, overrides);
+  assertPlanOptions(options);
+  return options;
 }

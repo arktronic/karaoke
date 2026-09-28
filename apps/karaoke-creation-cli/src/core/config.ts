@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
+import { DEFAULT_PLAN_OPTIONS, resolveAndValidatePlanOptions } from 'lrc2ass';
 import type { KaraokeConfig, KaraokeConfigOverrides } from '../types/options.js';
 
 export const DEFAULT_CONFIG: KaraokeConfig = {
   width: 1920,
   height: 1080,
-  fps: 24,
+  fps: 60,
   visualizer: {
     preset: 'Flexi, martin + geiss - dedicated to the sherwin maxawow',
   },
@@ -19,6 +20,7 @@ export function mergeConfig(
     return base;
   }
 
+  const plan = overrides.plan ?? base.plan;
   return {
     width: overrides.width ?? base.width,
     height: overrides.height ?? base.height,
@@ -26,6 +28,7 @@ export function mergeConfig(
     visualizer: {
       preset: overrides.visualizer?.preset ?? base.visualizer.preset,
     },
+    ...(plan === undefined ? {} : { plan }),
   };
 }
 
@@ -42,6 +45,19 @@ function validateConfigOverrides(value: unknown): asserts value is KaraokeConfig
       (typeof number !== 'number' || !Number.isSafeInteger(number) || number <= 0)
     ) {
       throw new Error(`Config ${key} must be a positive safe integer`);
+    }
+  }
+
+  const plan = overrides.plan;
+  if (plan !== undefined && (typeof plan !== 'object' || plan === null || Array.isArray(plan))) {
+    throw new Error('Config plan must be a JSON object');
+  }
+  if (plan !== undefined) {
+    try {
+      resolveAndValidatePlanOptions(DEFAULT_PLAN_OPTIONS, plan);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Config plan is invalid: ${message}`, { cause: error });
     }
   }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { planEvents } from '../src/index.js';
-import type { NormalizedLyrics, PlanOptions } from '../src/index.js';
+import { DEFAULT_PLAN_OPTIONS, planEvents } from '../src/index.js';
+import type { NormalizedLyrics, PlanOptions, PlanOverrideOptions } from '../src/index.js';
 
 const options: PlanOptions = {
   karaokeEffect: 'none',
@@ -1514,6 +1514,15 @@ describe('planEvents', () => {
     ).toThrow(RangeError);
   });
 
+  it.each([{ layout: null }, { interlude: null }, { styles: null }, { styles: { lyrics: null } }])(
+    'rejects malformed nested planner override containers %#',
+    (overrides) => {
+      expect(() =>
+        planEvents({ occurrences: [] }, options, overrides as unknown as PlanOverrideOptions),
+      ).toThrow(TypeError);
+    },
+  );
+
   it('rejects a row block that exactly equals resolutionY (would produce a top row MarginV of 0)', () => {
     // rowCount 2 * rowHeightPx 30 = 60 == resolutionY 60, an "exact fit" that must still be rejected.
     expect(() =>
@@ -1590,11 +1599,17 @@ describe('planEvents', () => {
 
     const document = planEvents(normalized, {
       ...options,
-      interlude: { minGapMs: 3_000, marginMs: 100, strategy: 'progress-bar' },
+      interlude: {
+        minGapMs: 3_000,
+        marginMs: 100,
+        strategy: 'progress-bar',
+        progressBarY: 166,
+        progressBarHeightPx: 24,
+      },
     });
 
     // layout: resolutionX 384, marginLeft/Right 10 -> barLeft 10, barWidth 364; resolutionY 288,
-    // barHeight 24 -> barTop 132; radius clamps to 8. Single-line preset interlude colors:
+    // barHeight 24, explicit barTop 166; radius clamps to 8. Single-line preset interlude colors:
     // primaryColor #FFFFFF (fill), secondaryColor #808080 (track), outlineColor #000000 (border).
     const path =
       'm 8 0 l 356 0 b 364 0 364 0 364 8 l 364 16 b 364 24 364 24 356 24 l 8 24 ' +
@@ -1606,7 +1621,7 @@ describe('planEvents', () => {
         startMs: 1_100,
         endMs: 4_900,
         style: 'Interlude',
-        text: `{\\p1\\an7\\pos(10,132)\\shad0\\1c&H00808080&\\3c&H00000000&}${path}{\\p0}`,
+        text: `{\\p1\\an7\\pos(10,166)\\shad0\\1c&H00808080&\\3c&H00000000&}${path}{\\p0}`,
       },
       {
         layer: 1,
@@ -1614,11 +1629,81 @@ describe('planEvents', () => {
         endMs: 4_900,
         style: 'Interlude',
         text:
-          '{\\p1\\an7\\pos(10,132)\\shad0\\1c&H00FFFFFF&\\3c&H00000000&' +
-          '\\clip(10,132,10,156)\\t(0,3800,\\clip(10,132,374,156))}' +
+          '{\\p1\\an7\\pos(10,166)\\shad0\\1c&H00FFFFFF&\\3c&H00000000&' +
+          '\\clip(10,0,10,288)\\t(0,3800,\\clip(10,0,374,288))}' +
           `${path}{\\p0}`,
       },
     ]);
+
+    const positionedDocument = planEvents(normalized, {
+      ...options,
+      interlude: {
+        minGapMs: 3_000,
+        marginMs: 100,
+        strategy: 'progress-bar',
+        progressBarY: 40,
+        progressBarHeightPx: 32,
+      },
+    });
+    const positionedEvents = positionedDocument.events.filter(
+      (event) => event.style === 'Interlude',
+    );
+    expect(positionedEvents[0]?.text).toContain('\\pos(10,40)');
+    expect(positionedEvents[1]?.text).toContain('\\pos(10,40)');
+    expect(positionedEvents[1]?.text).toContain('\\clip(10,0,10,288)');
+    expect(positionedEvents[1]?.text).toContain('\\clip(10,0,374,288)');
+    expect(() =>
+      planEvents(normalized, {
+        ...options,
+        interlude: {
+          minGapMs: 3_000,
+          strategy: 'progress-bar',
+          progressBarHeightPx: 0,
+        },
+      }),
+    ).toThrow(RangeError);
+    expect(() =>
+      planEvents(normalized, {
+        ...options,
+        interlude: {
+          minGapMs: 3_000,
+          strategy: 'progress-bar',
+          progressBarY: -1,
+        },
+      }),
+    ).toThrow(RangeError);
+  });
+
+  it('rejects progress bars that extend beyond the effective canvas', () => {
+    expect(() =>
+      planEvents({ occurrences: [] }, DEFAULT_PLAN_OPTIONS, {
+        preset: 'single-line',
+        layout: { resolutionY: 384 },
+      }),
+    ).toThrow(RangeError);
+
+    expect(() =>
+      planEvents(
+        { occurrences: [] },
+        { ...options, preset: 'single-line' },
+        {
+          interlude: {
+            minGapMs: 3_000,
+            strategy: 'progress-bar',
+            progressBarY: 260,
+            progressBarHeightPx: 30,
+          },
+        },
+      ),
+    ).toThrow(RangeError);
+
+    expect(() =>
+      planEvents({ occurrences: [] }, DEFAULT_PLAN_OPTIONS, {
+        preset: 'single-line',
+        layout: { resolutionY: 384 },
+        interlude: { minGapMs: 8_000, strategy: 'text' },
+      }),
+    ).not.toThrow();
   });
 
   it('adds an interlude for a leading gap before the very first lyric', () => {

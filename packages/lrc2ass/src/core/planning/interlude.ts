@@ -1,11 +1,11 @@
 import type { AssEvent } from '../../types/index.js';
 import { assColorFromHex } from '../color.js';
+import { DEFAULT_PROGRESS_BAR_HEIGHT_PX, DEFAULT_PROGRESS_BAR_Y_PX } from '../defaults.js';
 import type { ResolvedPlanOptions } from './options.js';
 import { resolveInterludeBounds } from './timing.js';
 
 export const INTERLUDE_STYLE_NAME = 'Interlude';
 const DEFAULT_INTERLUDE_TEXT = '♪ Instrumental ♪';
-const PROGRESS_BAR_HEIGHT_PX = 24;
 const PROGRESS_BAR_RADIUS_PX = 8;
 
 // Drawing-mode (\p1) path for a rounded rectangle, local origin at its own top-left corner.
@@ -46,14 +46,18 @@ export function addInterludeEvents(
         const barLeft = options.layout.marginLeft;
         const barWidth =
           options.layout.resolutionX - options.layout.marginLeft - options.layout.marginRight;
-        const barHeight = Math.min(PROGRESS_BAR_HEIGHT_PX, options.layout.resolutionY);
-        const barTop = Math.round((options.layout.resolutionY - barHeight) / 2);
+        const barHeight = Math.min(
+          interlude.progressBarHeightPx ?? DEFAULT_PROGRESS_BAR_HEIGHT_PX,
+          options.layout.resolutionY,
+        );
+        const barTop = interlude.progressBarY ?? DEFAULT_PROGRESS_BAR_Y_PX;
         const radius = Math.max(0, Math.min(PROGRESS_BAR_RADIUS_PX, barHeight / 2, barWidth / 2));
         const path = roundedRectPath(barWidth, barHeight, radius);
         const interludeStyleOptions = options.styles.interlude ?? {};
         const trackColor = assColorFromHex(interludeStyleOptions.secondaryColor ?? '#808080');
         const fillColor = assColorFromHex(interludeStyleOptions.primaryColor ?? '#FFFFFF');
         const borderColor = assColorFromHex(interludeStyleOptions.outlineColor ?? '#000000');
+        const clipBottom = options.layout.resolutionY;
         events.push({
           layer: 0,
           startMs,
@@ -68,8 +72,8 @@ export function addInterludeEvents(
           style,
           text:
             `{\\p1\\an7\\pos(${barLeft},${barTop})\\shad0\\1c${fillColor}\\3c${borderColor}` +
-            `\\clip(${barLeft},${barTop},${barLeft},${barTop + barHeight})` +
-            `\\t(0,${endMs - startMs},\\clip(${barLeft},${barTop},${barLeft + barWidth},${barTop + barHeight}))}` +
+            `\\clip(${barLeft},0,${barLeft},${clipBottom})` +
+            `\\t(0,${endMs - startMs},\\clip(${barLeft},0,${barLeft + barWidth},${clipBottom}))}` +
             `${path}{\\p0}`,
         });
       } else {

@@ -80,7 +80,14 @@ export async function renderKaraoke(options: RuntimeOptions): Promise<void> {
     jassubModernWasmUrl,
     jassubFontUrl,
   } = options;
-  console.log(`[runtime] starting render: ${width}x${height}@${fps}fps, preset=${presetName}`);
+  const activePresetName = presetData
+    ? typeof presetData.name === 'string' && presetData.name.length > 0
+      ? presetData.name
+      : 'custom file'
+    : presetName;
+  console.log(
+    `[runtime] starting render: ${width}x${height}@${fps}fps, preset=${activePresetName}`,
+  );
   const audioBytes = base64ToArrayBuffer(audioBase64);
 
   const audioContext = new AudioContext();

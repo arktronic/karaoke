@@ -40,6 +40,10 @@ export interface InterludeOptions {
   style?: string;
   /** Gap (ms) kept clear on each side of an interlude so it doesn't touch the adjacent lyrics. */
   marginMs?: number;
+  /** Progress bar top-edge Y coordinate in ASS canvas pixels; defaults to 622. */
+  progressBarY?: number;
+  /** Progress bar height in pixels; defaults to 90. */
+  progressBarHeightPx?: number;
   /** Time a lyric remains visible after its start, or its final enhanced segment start. */
   trailingLyricDurationMs?: number;
   /**

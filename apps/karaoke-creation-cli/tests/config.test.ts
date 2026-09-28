@@ -42,6 +42,15 @@ describe('mergeConfig', () => {
     const merged = mergeConfig(DEFAULT_CONFIG, { visualizer: { preset: 'Custom Preset' } });
     expect(merged.visualizer.preset).toBe('Custom Preset');
   });
+
+  it('preserves plan overrides when applying CLI config overrides', () => {
+    const plan = { layout: { resolutionX: 1280, resolutionY: 720 } };
+    const base = mergeConfig(DEFAULT_CONFIG, { plan });
+    const merged = mergeConfig(base, { width: 1280 });
+
+    expect(merged.plan).toEqual(plan);
+    expect(merged.width).toBe(1280);
+  });
 });
 
 describe('loadConfig', () => {
@@ -55,6 +64,16 @@ describe('loadConfig', () => {
     });
   });
 
+  it('loads planner options from JSON config', async () => {
+    const plan = {
+      layout: { resolutionX: 1280, resolutionY: 720 },
+      interlude: { minGapMs: 8_000, strategy: 'progress-bar', progressBarY: 500 },
+    };
+    const config = await loadConfigFromJson(JSON.stringify({ plan }));
+
+    expect(config.plan).toEqual(plan);
+  });
+
   it.each([
     ['null root', 'null'],
     ['array root', '[]'],
@@ -63,6 +82,13 @@ describe('loadConfig', () => {
     ['fractional fps', '{"fps":24.5}'],
     ['unsafe integer fps', '{"fps":9007199254740992}'],
     ['null visualizer', '{"visualizer":null}'],
+    ['null plan', '{"plan":null}'],
+    ['array plan', '{"plan":[]}'],
+    ['null layout', '{"plan":{"layout":null}}'],
+    ['array interlude', '{"plan":{"interlude":[]}}'],
+    ['null styles', '{"plan":{"styles":null}}'],
+    ['null lyrics style', '{"plan":{"styles":{"lyrics":null}}}'],
+    ['non-string font name', '{"plan":{"styles":{"lyrics":{"fontName":42}}}}'],
     ['non-string preset', '{"visualizer":{"preset":42}}'],
     ['empty preset', '{"visualizer":{"preset":"  "}}'],
   ])('rejects %s', async (_name, json) => {
