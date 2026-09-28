@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { planEvents } from '../src/index.js';
-import type { NormalizedLyrics, PlanOptions } from '../src/index.js';
+import type { NormalizedLyrics, PlanOptions, PlanOverrideOptions } from '../src/index.js';
 
 const options: PlanOptions = {
   karaokeEffect: 'none',
@@ -1513,6 +1513,15 @@ describe('planEvents', () => {
       ),
     ).toThrow(RangeError);
   });
+
+  it.each([{ layout: null }, { interlude: null }, { styles: null }, { styles: { lyrics: null } }])(
+    'rejects malformed nested planner override containers %#',
+    (overrides) => {
+      expect(() =>
+        planEvents({ occurrences: [] }, options, overrides as unknown as PlanOverrideOptions),
+      ).toThrow(TypeError);
+    },
+  );
 
   it('rejects a row block that exactly equals resolutionY (would produce a top row MarginV of 0)', () => {
     // rowCount 2 * rowHeightPx 30 = 60 == resolutionY 60, an "exact fit" that must still be rejected.

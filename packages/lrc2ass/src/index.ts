@@ -11,3 +11,4 @@ export {
   DEFAULT_TRAILING_DURATION_MS,
 } from './core/defaults.js';
 export { convert } from './core/convert.js';
+export { resolveAndValidatePlanOptions } from './core/planning/options.js';

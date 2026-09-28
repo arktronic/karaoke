@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { DEFAULT_PLAN_OPTIONS, resolveAndValidatePlanOptions } from 'lrc2ass';
 import type { KaraokeConfig, KaraokeConfigOverrides } from '../types/options.js';
 
 export const DEFAULT_CONFIG: KaraokeConfig = {
@@ -50,6 +51,14 @@ function validateConfigOverrides(value: unknown): asserts value is KaraokeConfig
   const plan = overrides.plan;
   if (plan !== undefined && (typeof plan !== 'object' || plan === null || Array.isArray(plan))) {
     throw new Error('Config plan must be a JSON object');
+  }
+  if (plan !== undefined) {
+    try {
+      resolveAndValidatePlanOptions(DEFAULT_PLAN_OPTIONS, plan);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Config plan is invalid: ${message}`);
+    }
   }
 
   const visualizer = overrides.visualizer;

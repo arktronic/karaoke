@@ -84,6 +84,11 @@ describe('loadConfig', () => {
     ['null visualizer', '{"visualizer":null}'],
     ['null plan', '{"plan":null}'],
     ['array plan', '{"plan":[]}'],
+    ['null layout', '{"plan":{"layout":null}}'],
+    ['array interlude', '{"plan":{"interlude":[]}}'],
+    ['null styles', '{"plan":{"styles":null}}'],
+    ['null lyrics style', '{"plan":{"styles":{"lyrics":null}}}'],
+    ['non-string font name', '{"plan":{"styles":{"lyrics":{"fontName":42}}}}'],
     ['non-string preset', '{"visualizer":{"preset":42}}'],
     ['empty preset', '{"visualizer":{"preset":"  "}}'],
   ])('rejects %s', async (_name, json) => {

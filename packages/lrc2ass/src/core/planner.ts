@@ -5,7 +5,7 @@ import type {
   PlanOptions,
   PlanOverrideOptions,
 } from '../types/index.js';
-import { assertPlanOptions, PLAN_PRESETS, resolvePlanOptions } from './planning/options.js';
+import { PLAN_PRESETS, resolveAndValidatePlanOptions } from './planning/options.js';
 import { createStyle, alignmentTag, computeRowBlockTopMargin } from './planning/style.js';
 import {
   escapeAssText,
@@ -39,8 +39,7 @@ export function planEvents(
   baseOptions: PlanOptions,
   overrideOptions?: PlanOverrideOptions,
 ): AssDocument {
-  const options = resolvePlanOptions(baseOptions, overrideOptions);
-  assertPlanOptions(options);
+  const options = resolveAndValidatePlanOptions(baseOptions, overrideOptions);
   const wrapBudget = computeWrapBudget(options);
   const occurrences: NormalizedLyrics['occurrences'] = [];
   const sourceOccurrenceIndices: number[] = [];
