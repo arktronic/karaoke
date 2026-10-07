@@ -43,6 +43,33 @@ describe('renderOfflineFrames', () => {
     expect(context.resume).toHaveBeenCalledTimes(1);
   });
 
+  it('updates audio at 60 FPS while rendering output at 24 FPS', async () => {
+    const context = {
+      suspend: vi.fn(async () => undefined),
+      resume: vi.fn(async () => undefined),
+      startRendering: vi.fn(async () => undefined),
+    };
+    const outputTimes: number[] = [];
+    const updateTimes: number[] = [];
+
+    await renderOfflineFrames(
+      context,
+      3,
+      24,
+      async (_frame, time) => {
+        outputTimes.push(time);
+      },
+      async (time) => {
+        updateTimes.push(time);
+      },
+      60,
+    );
+
+    expect(outputTimes).toEqual([0, 1 / 24, 2 / 24]);
+    expect(updateTimes).toEqual([0, 1 / 60, 2 / 60, 3 / 60, 4 / 60, 5 / 60]);
+    expect(context.suspend).toHaveBeenCalledTimes(6);
+  });
+
   it('resumes the context and propagates frame failures', async () => {
     const suspended = createDeferred<void>();
     const rendering = createDeferred<void>();

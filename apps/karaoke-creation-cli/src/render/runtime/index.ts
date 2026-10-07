@@ -186,26 +186,45 @@ export async function renderKaraoke(options: RuntimeOptions): Promise<void> {
   await output.start();
   console.log('[runtime] mediabunny output started, beginning frame-stepped offline render');
 
-  await renderOfflineFrames(offlineContext, totalFrames, fps, async (frame, time) => {
-    if (frame % 300 === 0) {
-      console.log(`[runtime] rendering frame ${frame}/${totalFrames}`);
-    }
-    visualizer.render({ elapsedTime: 1 / fps });
-    // manualRender round-trips to JASSUB's worker before painting subtitleCanvas, so it must be
-    // awaited before compositing, or the canvas will still hold the previous (or no) frame.
-    await jassub.manualRender({
-      expectedDisplayTime: performance.now(),
-      width,
-      height,
-      mediaTime: time,
-    });
+  const visualizerFps = Math.max(60, fps);
+  let intervalStartedAt = performance.now();
+  let intervalFrameCount = 0;
+  await renderOfflineFrames(
+    offlineContext,
+    totalFrames,
+    fps,
+    async (frame, time) => {
+      // manualRender round-trips to JASSUB's worker before painting subtitleCanvas, so it must be
+      // awaited before compositing, or the canvas will still hold the previous (or no) frame.
+      await jassub.manualRender({
+        expectedDisplayTime: performance.now(),
+        width,
+        height,
+        mediaTime: time,
+      });
 
-    compositeCtx.clearRect(0, 0, width, height);
-    compositeCtx.drawImage(vizCanvas, 0, 0);
-    compositeCtx.drawImage(subtitleCanvas, 0, 0);
+      compositeCtx.clearRect(0, 0, width, height);
+      compositeCtx.drawImage(vizCanvas, 0, 0);
+      compositeCtx.drawImage(subtitleCanvas, 0, 0);
 
-    await videoSource.add(time, 1 / fps);
-  });
+      await videoSource.add(time, 1 / fps);
+      intervalFrameCount++;
+      const completedFrames = frame + 1;
+      if (completedFrames % 300 === 0 || completedFrames === totalFrames) {
+        const now = performance.now();
+        const measuredFps = (intervalFrameCount * 1000) / (now - intervalStartedAt);
+        console.log(
+          `[runtime] rendering frame ${completedFrames}/${totalFrames} (${measuredFps.toFixed(1)} FPS)`,
+        );
+        intervalFrameCount = 0;
+        intervalStartedAt = now;
+      }
+    },
+    async () => {
+      visualizer.render({ elapsedTime: 1 / visualizerFps });
+    },
+    visualizerFps,
+  );
   console.log('[runtime] offline audio rendering and video frame capture complete, adding audio');
 
   await audioSource.add(audioBuffer);

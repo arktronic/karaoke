@@ -9,22 +9,42 @@ export async function renderOfflineFrames(
   totalFrames: number,
   fps: number,
   renderFrame: (frame: number, time: number) => Promise<void>,
+  updateFrame?: (time: number) => Promise<void>,
+  updateFps = fps,
 ): Promise<void> {
   const frameTasks: Promise<void>[] = [];
   let frameFailed = false;
   let frameError: unknown;
 
   if (totalFrames > 0) {
+    if (updateFrame) {
+      await updateFrame(0);
+    }
     await renderFrame(0, 0);
   }
 
-  for (let frame = 1; frame < totalFrames; frame++) {
-    const time = frame / fps;
+  let nextFrame = 1;
+  let nextUpdateTime = updateFrame ? 1 / updateFps : Number.POSITIVE_INFINITY;
+  const finalFrameTime = (totalFrames - 1) / fps;
+
+  while (nextFrame < totalFrames || nextUpdateTime <= finalFrameTime) {
+    const outputTime = nextFrame < totalFrames ? nextFrame / fps : Number.POSITIVE_INFINITY;
+    const timesCoincide = Math.abs(outputTime - nextUpdateTime) < 1e-9;
+    const renderOutputFrame = timesCoincide || outputTime < nextUpdateTime;
+    const updateAudioFrame = timesCoincide || nextUpdateTime < outputTime;
+    const frame = nextFrame;
+    const time = timesCoincide ? outputTime : Math.min(outputTime, nextUpdateTime);
+
     frameTasks.push(
       context.suspend(time).then(async () => {
         try {
           if (!frameFailed) {
-            await renderFrame(frame, time);
+            if (updateAudioFrame) {
+              await updateFrame?.(time);
+            }
+            if (renderOutputFrame && !frameFailed) {
+              await renderFrame(frame, time);
+            }
           }
         } catch (error) {
           if (!frameFailed) {
@@ -36,6 +56,13 @@ export async function renderOfflineFrames(
         }
       }),
     );
+
+    if (renderOutputFrame) {
+      nextFrame++;
+    }
+    if (updateAudioFrame) {
+      nextUpdateTime += 1 / updateFps;
+    }
   }
 
   const settledFrameTasks = Promise.allSettled(frameTasks);
