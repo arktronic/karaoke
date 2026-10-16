@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LRC Authoring Studio</title>
+  </head>
+  <body>
+    <header>
+      <h1>LRC Authoring Studio</h1>
+      <p>Create word-timed LRC files in your browser. Nothing is uploaded.</p>
+    </header>
+
+    <main>
+      <section id="audio-section">
+        <div id="dropzone">
+          <span id="audio-name">Drop an audio file anywhere on this page</span>
+          <label class="button">
+            Choose file
+            <input type="file" id="file-input" accept="audio/*" hidden />
+          </label>
+        </div>
+        <p id="audio-status" role="status"></p>
+      </section>
+
+      <section id="lyrics-section">
+        <h2>Lyrics</h2>
+        <textarea
+          id="lyrics-input"
+          rows="10"
+          spellcheck="false"
+          placeholder="Paste or type lyrics, one line per row"
+        ></textarea>
+        <div class="row">
+          <button type="button" id="lyrics-apply">Apply lyrics</button>
+          <button type="button" id="lyrics-search">Search online...</button>
+        </div>
+        <p class="hint">
+          Each word is timed separately. Use <code>/</code> to split a word into syllables
+          (<code>Hel/lo</code>) or <code>\/</code> for a literal slash. Blank lines are ignored.
+          Editing lyrics keeps timings of lines that did not change.
+        </p>
+      </section>
+
+      <section id="timing-section">
+        <h2>Timing</h2>
+        <div class="timing-controls">
+          <div class="row">
+            <button type="button" id="play">Play</button>
+            <button type="button" id="back">Back 5s</button>
+            <span id="time" class="mono">0:00.000 / 0:00.000</span>
+            <label>
+              Speed
+              <select id="speed">
+                <option value="0.5">0.5x</option>
+                <option value="0.75">0.75x</option>
+                <option value="1" selected>1x</option>
+              </select>
+            </label>
+            <label>
+              Zoom
+              <select id="zoom">
+                <option value="5000">5s</option>
+                <option value="10000" selected>10s</option>
+                <option value="20000">20s</option>
+                <option value="40000">40s</option>
+              </select>
+            </label>
+          </div>
+          <canvas id="waveform"></canvas>
+          <div class="row">
+            <button type="button" id="tap">Word start (Space)</button>
+            <button type="button" id="tap-end">Word end (F or J)</button>
+            <button type="button" id="undo">Undo (Z)</button>
+            <label>
+              Tap latency
+              <input type="number" id="latency" value="0" step="10" class="narrow" /> ms
+            </label>
+          </div>
+          <p id="tap-status" class="hint" role="status"></p>
+          <div class="row" id="slot-editor">
+            <span id="slot-label">Select a word to edit its time</span>
+            <input type="number" id="slot-ms" min="0" step="10" class="narrow" disabled />
+            <span>ms</span>
+            <button type="button" data-nudge="-100">-100</button>
+            <button type="button" data-nudge="-10">-10</button>
+            <button type="button" data-nudge="10">+10</button>
+            <button type="button" data-nudge="100">+100</button>
+            <button type="button" id="slot-end" disabled>Set end at playhead</button>
+            <button type="button" id="slot-clear">Clear</button>
+            <button type="button" id="slot-cursor">Tap from here</button>
+          </div>
+          <p class="hint">
+            While the song plays: press <kbd>Space</kbd> as each word starts. Optionally press
+            <kbd>F</kbd> or <kbd>J</kbd> when the word just sung ends; do this before a pause. A
+            word with no end lasts until the next word starts. Ends cannot be set after a syllable
+            (<code>Hel/lo</code>), only after a whole word.
+          </p>
+          <p class="hint">
+            <kbd>Z</kbd> or <kbd>Backspace</kbd> undoes the last press. <kbd>Enter</kbd> plays or
+            pauses. <kbd>Left</kbd>/<kbd>Right</kbd> nudge the selected time by 10 ms (Shift: 100
+            ms). Double-click a word to continue tapping from it. Drag markers on the waveform to
+            adjust them.
+          </p>
+        </div>
+        <div id="lines"></div>
+      </section>
+
+      <section id="export-section">
+        <h2>Export</h2>
+        <div class="row">
+          <button type="button" id="download" disabled>Download .lrc</button>
+          <button type="button" id="copy" disabled>Copy</button>
+        </div>
+        <p id="export-status" role="status"></p>
+        <textarea id="lrc-output" rows="8" readonly spellcheck="false"></textarea>
+      </section>
+    </main>
+
+    <dialog id="search-dialog">
+      <form method="dialog" id="search-form">
+        <h2>Search lyrics (LRCLIB)</h2>
+        <div class="row">
+          <input type="search" id="search-query" placeholder="Artist and title" />
+          <button type="submit">Search</button>
+          <button type="button" id="search-close">Close</button>
+        </div>
+      </form>
+      <p id="search-status" role="status"></p>
+      <ul id="search-results"></ul>
+    </dialog>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

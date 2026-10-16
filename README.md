@@ -2,7 +2,13 @@
 
 [![CI](https://github.com/arktronic/lrc2ass/actions/workflows/ci.yml/badge.svg)](https://github.com/arktronic/lrc2ass/actions/workflows/ci.yml)
 
-## App
+## Apps
+
+### lrc-authoring-studio
+
+Static web app for creating word-timed LRC files from audio and lyrics | [More](apps/lrc-authoring-studio/README.md)
+
+### karaoke-creation-cli
 
 In the works...
 
