@@ -58,17 +58,23 @@ const downloadButton = el<HTMLButtonElement>('download');
 const copyButton = el<HTMLButtonElement>('copy');
 const audioStatus = el('audio-status');
 
-const lines = new LinesView(el('lines'), {
-  onSelect: (ref) => {
-    select(ref);
-    const time = getSlotTime(project, ref);
-    if (time !== undefined && player.loaded) {
-      player.seekMs(time - SELECT_PREROLL_MS);
-      waveform.reveal(time);
-    }
+const timingControls = document.querySelector('.timing-controls') as HTMLElement;
+
+const lines = new LinesView(
+  el('lines'),
+  {
+    onSelect: (ref) => {
+      select(ref);
+      const time = getSlotTime(project, ref);
+      if (time !== undefined && player.loaded) {
+        player.seekMs(time - SELECT_PREROLL_MS);
+        waveform.reveal(time);
+      }
+    },
+    onSetCursor: (ref) => setCursor({ line: ref.line, token: ref.token }),
   },
-  onSetCursor: (ref) => setCursor({ line: ref.line, token: ref.token }),
-});
+  () => timingControls.getBoundingClientRect().bottom,
+);
 
 const waveform = new WaveformView(el<HTMLCanvasElement>('waveform'), {
   onSeek: (ms) => player.loaded && player.seekMs(ms),

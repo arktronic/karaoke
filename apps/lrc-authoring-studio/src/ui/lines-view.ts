@@ -25,6 +25,8 @@ export class LinesView {
   constructor(
     private readonly root: HTMLElement,
     private readonly callbacks: LinesCallbacks,
+    /** Viewport y below which content is not covered by sticky UI. */
+    private readonly topInset: () => number = () => 0,
   ) {}
 
   render(project: Project): void {
@@ -103,18 +105,38 @@ export class LinesView {
     }
   }
 
-  /** Scrolls so the line and the one after it are fully visible, within the box and the window. */
+  /**
+   * Scrolls so the line and the one after it are fully visible, within the box and the window.
+   * The box is scrolled first, then the page if the box is partly on screen.
+   */
   scrollToLine(lineIndex: number): void {
     const lineEl = this.lineEls[lineIndex];
     if (!lineEl) {
       return;
     }
     const ahead = this.lineEls[lineIndex + 1] ?? lineEl;
-    const line = lineEl.getBoundingClientRect();
+    const inset = Math.max(0, this.topInset());
     const box = this.root.getBoundingClientRect();
-    const bottom = Math.min(box.bottom, window.innerHeight);
-    if (line.top < box.top || ahead.getBoundingClientRect().bottom > bottom) {
-      this.root.scrollTop += line.top - box.top - box.height / 3;
+    const onScreen = box.bottom > inset && box.top < window.innerHeight;
+    const top = onScreen ? Math.max(box.top, inset) : box.top;
+    const bottom = onScreen ? Math.min(box.bottom, window.innerHeight) : box.bottom;
+
+    const line = lineEl.getBoundingClientRect();
+    if (line.top < top || ahead.getBoundingClientRect().bottom > bottom) {
+      this.root.scrollTop += line.top - top - (bottom - top) / 3;
+    }
+    if (!onScreen) {
+      return;
+    }
+
+    const lineTop = lineEl.getBoundingClientRect().top;
+    const aheadBottom = ahead.getBoundingClientRect().bottom;
+    const shift =
+      aheadBottom > window.innerHeight
+        ? Math.min(aheadBottom - window.innerHeight, lineTop - inset)
+        : Math.min(0, lineTop - inset);
+    if (shift !== 0) {
+      window.scrollBy(0, shift);
     }
   }
 

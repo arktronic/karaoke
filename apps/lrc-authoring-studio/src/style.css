@@ -204,6 +204,10 @@ textarea {
   background: #1f4f80;
 }
 
+.chip.sung .chip-time {
+  color: var(--text);
+}
+
 .chip.active {
   background: var(--accent);
   color: #000;

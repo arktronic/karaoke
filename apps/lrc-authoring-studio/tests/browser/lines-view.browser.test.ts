@@ -121,4 +121,87 @@ describe('LinesView', () => {
 
     expect(root.scrollTop).toBeGreaterThan(0);
   });
+
+  describe('when the page scrolls', () => {
+    const many: Project = {
+      lines: Array.from({ length: 40 }, (_, i) => ({
+        tokens: [{ text: `line${i}`, spaceAfter: false }],
+      })),
+    };
+    let spacer: HTMLElement;
+    let tail: HTMLElement;
+    let bar: HTMLElement;
+
+    const lineEl = (i: number): HTMLElement => root.querySelectorAll<HTMLElement>('.line')[i];
+
+    const placeBoxWithVisible = (visible: number): void => {
+      spacer.style.height = '0';
+      window.scrollTo(0, 0);
+      spacer.style.height = `${window.innerHeight - visible - root.getBoundingClientRect().top}px`;
+      expect(root.getBoundingClientRect().top).toBe(window.innerHeight - visible);
+    };
+
+    beforeEach(() => {
+      bar = document.createElement('div');
+      bar.style.cssText = 'position: sticky; top: 0; z-index: 1; height: 120px; background: #444';
+      spacer = document.createElement('div');
+      tail = document.createElement('div');
+      tail.style.height = `${window.innerHeight}px`;
+      root.before(bar, spacer);
+      root.after(tail);
+      root.style.cssText = 'height: 405px; overflow-y: auto';
+      view = new LinesView(
+        root,
+        { onSelect, onSetCursor },
+        () => bar.getBoundingClientRect().bottom,
+      );
+      view.render(many);
+    });
+
+    afterEach(() => {
+      bar.remove();
+      spacer.remove();
+      tail.remove();
+      window.scrollTo(0, 0);
+    });
+
+    it('reveals the followed line when only 80px of the box is on screen', () => {
+      placeBoxWithVisible(80);
+
+      view.setCursor({ line: 20, token: 0 });
+
+      expect(lineEl(20).getBoundingClientRect().top).toBeGreaterThanOrEqual(bar.offsetHeight);
+      expect(lineEl(21).getBoundingClientRect().bottom).toBeLessThanOrEqual(window.innerHeight + 1);
+    });
+
+    it('scrolls the page when the visible slice is too short for the line and the next', () => {
+      placeBoxWithVisible(40);
+
+      view.setCursor({ line: 20, token: 0 });
+
+      expect(window.scrollY).toBeGreaterThan(0);
+      expect(lineEl(20).getBoundingClientRect().top).toBeGreaterThanOrEqual(bar.offsetHeight);
+      expect(lineEl(21).getBoundingClientRect().bottom).toBeLessThanOrEqual(window.innerHeight + 1);
+    });
+
+    it('keeps the followed line out from under the sticky controls', () => {
+      spacer.style.height = `${window.innerHeight * 2}px`;
+      window.scrollTo(0, root.offsetTop - 40);
+      expect(root.getBoundingClientRect().top).toBeLessThan(bar.offsetHeight);
+
+      view.setCursor({ line: 0, token: 0 });
+
+      expect(lineEl(0).getBoundingClientRect().top).toBeGreaterThanOrEqual(bar.offsetHeight);
+    });
+
+    it('does not scroll the page when the box is off screen', () => {
+      spacer.style.height = `${window.innerHeight * 2}px`;
+      window.scrollTo(0, 0);
+
+      view.setCursor({ line: 20, token: 0 });
+
+      expect(window.scrollY).toBe(0);
+      expect(root.scrollTop).toBeGreaterThan(0);
+    });
+  });
 });
