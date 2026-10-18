@@ -15,10 +15,8 @@
       <section id="audio-section">
         <div id="dropzone">
           <span id="audio-name">Drop an audio file anywhere on this page</span>
-          <label class="button">
-            Choose file
-            <input type="file" id="file-input" accept="audio/*" hidden />
-          </label>
+          <button type="button" id="choose-file">Choose file</button>
+          <input type="file" id="file-input" accept="audio/*" hidden />
         </div>
         <p id="audio-status" role="status"></p>
       </section>
@@ -48,6 +46,7 @@
           <div class="row">
             <button type="button" id="play">Play</button>
             <button type="button" id="back">Back 5s</button>
+            <button type="button" id="restart">Start (Home)</button>
             <span id="time" class="mono">0:00.000 / 0:00.000</span>
             <label>
               Speed
@@ -98,9 +97,9 @@
           </p>
           <p class="hint">
             <kbd>Z</kbd> or <kbd>Backspace</kbd> undoes the last press. <kbd>Enter</kbd> plays or
-            pauses. <kbd>Left</kbd>/<kbd>Right</kbd> nudge the selected time by 10 ms (Shift: 100
-            ms). Double-click a word to continue tapping from it. Drag markers on the waveform to
-            adjust them.
+            pauses. <kbd>Home</kbd> returns to the start. <kbd>Left</kbd>/<kbd>Right</kbd> nudge the
+            selected time by 10 ms (Shift: 100 ms). Double-click a word to continue tapping from it.
+            Drag markers on the waveform to adjust them.
           </p>
         </div>
         <div id="lines"></div>

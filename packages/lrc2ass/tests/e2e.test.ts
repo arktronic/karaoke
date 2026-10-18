@@ -35,6 +35,14 @@ describe('convert end-to-end', () => {
     expect(result.text).not.toMatch(/Dialogue:.*Preview,/);
   });
 
+  it('ends the last word of a line at its line-final timestamp', () => {
+    const result = convert('[offset:0]\r\n[00:00.00]<00:00.00>Hi<00:01.00>\r\n[00:10.00]Next\r\n', {
+      plan: { karaokeEffect: 'sweep' },
+    });
+
+    expect(result.text).toContain('{\\kf100}Hi');
+  });
+
   it('encodes enhanced word timing as kf karaoke tags for a sweep effect', () => {
     const result = convert('[offset:0]\r\n[00:00.00]He<00:00.50>llo<00:01.00> there\r\n', {
       plan: { karaokeEffect: 'sweep' },

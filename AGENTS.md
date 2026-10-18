@@ -6,3 +6,4 @@
 - For options-merge audits, always check both risks: (1) caller-intent loss from premature merging and (2) undefined overwriting inherited/default values.
 - Do not use npx or npm; always prefer existing npm scripts via `pnpm`.
 - Use `pnpm validate` as appropriate, instead of a series of separate test/lint/prettier runs.
+- Workspace projects are independent by default unless explicitly required otherwise: `lrc-authoring-studio` and `lrc2ass` must never depend on each other (no package dependency, no cross-package imports or tests). Interoperate only through documented file formats, and cover each side with its own tests.

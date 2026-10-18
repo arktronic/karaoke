@@ -20,6 +20,7 @@ Use `/` in lyrics to split a word into separately timed syllables (`Hel/lo`); `\
 | F or J            | End the word just started (only while playing)  |
 | Z or Backspace    | Undo the last Space / F / J press and seek back |
 | Enter             | Play / pause                                    |
+| Home              | Seek to the start of the track                  |
 | Left / Right      | Nudge the selected time by 10 ms (Shift 100)    |
 | Double-click chip | Continue tapping from that word                 |
 

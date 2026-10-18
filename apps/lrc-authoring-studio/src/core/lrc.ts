@@ -10,7 +10,8 @@ export interface LrcExport {
 /**
  * Writes enhanced LRC; lines with any untimed token are omitted.
  * A word end is written right after the word, before its trailing space, so the silence
- * that follows lives in a whitespace-only segment.
+ * that follows lives in a whitespace-only segment. A line-final end gets a space too, so
+ * parsers that only keep tags followed by text still see it.
  */
 export function serializeLrc(project: Project): LrcExport {
   const out: string[] = [];
@@ -24,12 +25,13 @@ export function serializeLrc(project: Project): LrcExport {
 
     let text = `[${formatLrcTime(line.tokens[0].startMs!)}]`;
     line.tokens.forEach((token, i) => {
-      const isWordEnd = token.spaceAfter || i === line.tokens.length - 1;
+      const isLast = i === line.tokens.length - 1;
+      const isWordEnd = token.spaceAfter || isLast;
       text += `<${formatLrcTime(token.startMs!)}>${token.text}`;
       if (token.endMs !== undefined && isWordEnd) {
         text += `<${formatLrcTime(token.endMs)}>`;
       }
-      if (token.spaceAfter) {
+      if (token.spaceAfter || (isLast && token.endMs !== undefined)) {
         text += ' ';
       }
     });

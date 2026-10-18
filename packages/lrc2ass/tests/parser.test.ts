@@ -71,6 +71,19 @@ describe('parseLrc', () => {
     expect(result.document.lines[0].enhancedSegments).toBeUndefined();
   });
 
+  it('keeps a line-final timestamp as an empty trailing segment', () => {
+    const result = parseLrc('[00:10.00]Hello<00:11.00>', { mode: 'tolerant' });
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.document.lines[0].text).toBe('Hello');
+    expect(
+      result.document.lines[0].enhancedSegments?.map((segment) => [segment.text, segment.timeMs]),
+    ).toEqual([
+      ['Hello', 0],
+      ['', 1000],
+    ]);
+  });
+
   it('reports unclosed timestamp-like enhanced markers', () => {
     const result = parseLrc('[00:01.00]hello<00:02.00', { mode: 'tolerant' });
 

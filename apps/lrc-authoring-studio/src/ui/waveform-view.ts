@@ -87,6 +87,7 @@ export class WaveformView {
 
   setWindowMs(ms: number): void {
     this.windowMs = ms;
+    this.reveal(this.playheadMs);
     this.dirty = true;
   }
 

@@ -226,6 +226,12 @@ function togglePlay(): void {
   }
 }
 
+function seekToStart(): void {
+  if (player.loaded) {
+    player.seekMs(0);
+  }
+}
+
 async function loadAudio(file: File): Promise<void> {
   const id = ++loadId;
   audioStatus.textContent = 'Loading audio...';
@@ -258,15 +264,17 @@ async function loadAudio(file: File): Promise<void> {
   }
 }
 
-function isTextField(target: EventTarget | null): boolean {
+function isShortcutExempt(target: EventTarget | null): boolean {
   return (
     target instanceof HTMLElement &&
-    (target.matches('textarea, select, input') || target.isContentEditable)
+    (target.matches('textarea, select, input') ||
+      target.isContentEditable ||
+      target.closest('dialog') !== null)
   );
 }
 
 document.addEventListener('keydown', (e) => {
-  if (isTextField(e.target) || e.ctrlKey || e.metaKey || e.altKey) {
+  if (isShortcutExempt(e.target) || e.ctrlKey || e.metaKey || e.altKey) {
     return;
   }
   switch (e.key.toLowerCase()) {
@@ -295,6 +303,10 @@ document.addEventListener('keydown', (e) => {
         togglePlay();
       }
       break;
+    case 'home':
+      e.preventDefault();
+      seekToStart();
+      break;
     case 'arrowleft':
     case 'arrowright':
       if (selected) {
@@ -307,7 +319,7 @@ document.addEventListener('keydown', (e) => {
 
 // Space on a focused button would otherwise also click it on release.
 document.addEventListener('keyup', (e) => {
-  if (e.key === ' ' && !isTextField(e.target)) {
+  if (e.key === ' ' && !isShortcutExempt(e.target)) {
     e.preventDefault();
   }
 });
@@ -337,6 +349,7 @@ el<HTMLInputElement>('file-input').addEventListener('change', (e) => {
   }
   input.value = '';
 });
+el('choose-file').addEventListener('click', () => el<HTMLInputElement>('file-input').click());
 
 const openSearch = setupSearchDialog(el<HTMLDialogElement>('search-dialog'), (lyrics) => {
   lyricsInput.value = lyrics;
@@ -354,6 +367,7 @@ for (const type of ['play', 'pause', 'ended']) {
   });
 }
 el('back').addEventListener('click', () => player.loaded && player.seekMs(player.currentMs - 5000));
+el('restart').addEventListener('click', seekToStart);
 el<HTMLSelectElement>('speed').addEventListener('change', (e) =>
   player.setRate(Number((e.target as HTMLSelectElement).value)),
 );

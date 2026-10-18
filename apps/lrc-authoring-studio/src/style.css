@@ -74,7 +74,6 @@ code,
 }
 
 button,
-.button,
 select,
 input,
 textarea {
@@ -86,13 +85,11 @@ textarea {
   padding: 4px 10px;
 }
 
-button,
-.button {
+button {
   cursor: pointer;
 }
 
-button:hover:not(:disabled),
-.button:hover {
+button:hover:not(:disabled) {
   border-color: var(--accent);
 }
 

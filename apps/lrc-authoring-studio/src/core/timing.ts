@@ -93,7 +93,7 @@ export function clearSlotTime(project: Project, ref: SlotRef): Project {
 
 /**
  * Tap semantics: a start is clamped to the previous word's start and an end to its own start.
- * Times this overtakes (the previous word's end, or later times) are cleared.
+ * Times this overtakes (earlier ends, or later times) are cleared.
  * Returns the same project when an end is not allowed there.
  */
 export function setSlotTime(project: Project, ref: SlotRef, ms: number): Project {
@@ -111,10 +111,11 @@ export function setSlotTime(project: Project, ref: SlotRef, ms: number): Project
 
   const time = Math.max(Math.round(ms), lower ?? 0, 0);
   flat[index] = time;
-  if (ref.kind === 'start' && index > 0) {
-    const previousEnd = flat[index - 1];
-    if (previousEnd !== undefined && previousEnd > time) {
-      flat[index - 1] = undefined;
+  // Earlier starts are already <= time because of the clamp, so only ends can be overtaken.
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const earlier = flat[i];
+    if (i % 2 === 1 && earlier !== undefined && earlier > time) {
+      flat[i] = undefined;
     }
   }
   for (let i = index + 1; i < flat.length; i += 1) {

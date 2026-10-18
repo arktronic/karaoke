@@ -53,10 +53,10 @@ describe('serializeLrc', () => {
     expect(serializeLrc(p).text).toBe('[00:01.00]<00:01.00>a<00:01.50> <00:03.00>b\n');
   });
 
-  it('writes the last word end as a trailing tag', () => {
+  it('writes the last word end as a trailing tag followed by a space', () => {
     let p = timed('a b', [1000, 2000]);
     p = setSlotTime(p, { line: 0, token: 1, kind: 'end' }, 3000);
-    expect(serializeLrc(p).text).toBe('[00:01.00]<00:01.00>a <00:02.00>b<00:03.00>\n');
+    expect(serializeLrc(p).text).toBe('[00:01.00]<00:01.00>a <00:02.00>b<00:03.00> \n');
   });
 
   it('ignores an end that sits on a syllable', () => {
