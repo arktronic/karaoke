@@ -36,6 +36,7 @@ export class WaveformView {
   private cssWidth = 0;
   private cssHeight = 0;
   private drag: { ref?: SlotRef } | undefined;
+  private playheadMovedDuringDrag = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -97,6 +98,7 @@ export class WaveformView {
       return;
     }
     this.playheadMs = ms;
+    this.playheadMovedDuringDrag ||= this.drag !== undefined;
     this.reveal(ms);
     this.dirty = true;
   }
@@ -212,11 +214,15 @@ export class WaveformView {
 
   private endDrag(): void {
     this.drag = undefined;
-    this.reveal(this.playheadMs);
+    if (this.playheadMovedDuringDrag) {
+      this.playheadMovedDuringDrag = false;
+      this.reveal(this.playheadMs);
+    }
   }
 
   private onPointerDown(e: PointerEvent): void {
     this.canvas.setPointerCapture(e.pointerId);
+    this.playheadMovedDuringDrag = false;
     const hit = this.markerAt(e.clientX);
     if (hit) {
       this.drag = { ref: hit.ref };

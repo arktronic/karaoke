@@ -126,6 +126,43 @@ describe('WaveformView pointer input', () => {
   describe('with a marker', () => {
     beforeEach(() => view.setProject(project));
 
+    describe('panned away from a paused playhead', () => {
+      // Three wheel steps start the view at 3 s, so the marker is at x = 120 and the playhead at 0 is offscreen.
+      const VIEW_START_MS = 3000;
+
+      beforeEach(() => {
+        for (let step = 0; step < 3; step += 1) {
+          canvas.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, cancelable: true }));
+        }
+      });
+
+      // The end marker sits at x = 300, so probe the mapping between the two markers.
+      async function expectViewportKept(): Promise<void> {
+        callbacks.onSeek.mockReset();
+        await userEvent.click(canvas, { position: { x: 200, y: 50 } });
+        expect(Math.abs(lastCallMs(callbacks.onSeek) - (VIEW_START_MS + 3333))).toBeLessThan(
+          TOLERANCE_MS,
+        );
+      }
+
+      it('keeps the viewport after selecting a marker', async () => {
+        await userEvent.click(canvas, { position: { x: 120, y: 50 } });
+
+        expect(callbacks.onMarkerSelect).toHaveBeenCalledWith(startRef);
+        await expectViewportKept();
+      });
+
+      it('keeps the viewport after dragging a marker', async () => {
+        await userEvent.dragAndDrop(canvas, canvas, {
+          sourcePosition: { x: 120, y: 50 },
+          targetPosition: { x: 240, y: 50 },
+        });
+
+        expect(callbacks.onMarkerMove).toHaveBeenCalled();
+        await expectViewportKept();
+      });
+    });
+
     it('selects a marker clicked within its hit radius instead of seeking', async () => {
       await userEvent.click(canvas, { position: { x: 304, y: 50 } });
 
