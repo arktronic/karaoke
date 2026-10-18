@@ -304,8 +304,11 @@ export function normalizeLyrics(
 
     let finalEnhancedSegmentStartMs: number | undefined;
     let trailingEnhancedEndMs: number | undefined;
+    // A line-final timestamp leaves an empty or whitespace-only trailing segment that ends the previous word.
+    let finalSegmentIsBoundary = false;
     if (curr.segments && curr.segments.length > 0) {
       const lastSegment = curr.segments[curr.segments.length - 1];
+      finalSegmentIsBoundary = curr.segments.length > 1 && lastSegment.text.trim() === '';
       const enhancedSegmentStartMs = addSafeMilliseconds(curr.startMs, lastSegment.timeMs);
       if (enhancedSegmentStartMs === undefined) {
         reportTimingOverflow(
@@ -332,6 +335,7 @@ export function normalizeLyrics(
       // Under 'preserve', if enhanced segments extend to or beyond nextStartMs, allow the line to extend with trailing duration
       if (
         overlapPolicy === 'preserve' &&
+        !finalSegmentIsBoundary &&
         finalEnhancedSegmentStartMs !== undefined &&
         finalEnhancedSegmentStartMs >= endMs
       ) {
@@ -349,15 +353,21 @@ export function normalizeLyrics(
       const finalTimingAnchorName =
         finalEnhancedSegmentStartMs === undefined
           ? 'final lyric start'
-          : 'final enhanced segment start';
+          : finalSegmentIsBoundary
+            ? 'line-final enhanced timestamp'
+            : 'final enhanced segment start';
       const finalDurationBound = finalDurationCandidates.find((candidate) => {
         if (candidate.value === undefined) {
           return false;
         }
-        if (candidate.value <= finalTimingAnchorMs) {
+        // A boundary may coincide with the bound; a sung segment needs positive duration.
+        const isBeforeAnchor = finalSegmentIsBoundary
+          ? candidate.value < finalTimingAnchorMs
+          : candidate.value <= finalTimingAnchorMs;
+        if (isBeforeAnchor) {
           diagnostics.push({
             code: 'LRC_FINAL_DURATION_BEFORE_LYRIC',
-            message: `${candidate.name} (${candidate.value}ms) is not later than the ${finalTimingAnchorName}.`,
+            message: `${candidate.name} (${candidate.value}ms) is ${finalSegmentIsBoundary ? 'earlier than' : 'not later than'} the ${finalTimingAnchorName}.`,
             severity: mode === 'strict' ? 'error' : 'warning',
             location: curr.location,
           });

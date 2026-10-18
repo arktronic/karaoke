@@ -391,7 +391,8 @@ function parseEnhancedSegments(
     };
   }
 
-  if (tail.length > 0) {
+  // A line-final tag with no text still marks where the previous segment ends.
+  if (tail.length > 0 || segments.length > 0) {
     segments.push({
       text: tail,
       timeMs: currentOffset,
