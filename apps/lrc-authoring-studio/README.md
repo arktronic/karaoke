@@ -44,3 +44,14 @@ pnpm --filter lrc-authoring-studio build
 The build uses a relative base path, so `dist` can be hosted from any static path (for example GitHub Pages).
 
 Pure logic (tokenizing, timing sequence, LRC serialization, peaks, LRCLIB client) lives in `src/core` and is unit-tested; `src/audio` and `src/ui` are thin browser wrappers.
+
+## Tests
+
+```sh
+pnpm --filter lrc-authoring-studio exec playwright install chromium firefox   # once
+pnpm --filter lrc-authoring-studio test          # unit + browser
+pnpm --filter lrc-authoring-studio test:unit     # Node, tests/*.test.ts
+pnpm --filter lrc-authoring-studio test:browser  # Chromium and Firefox, tests/browser/*.browser.test.ts
+```
+
+Browser tests (Vitest Browser Mode with Playwright) exercise the full app, `WaveformView` and `LinesView` with a generated WAV file. Browsers run headless and muted, so nothing is audible.

@@ -10,11 +10,15 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:browser": "vitest run --project \"browser*\"",
     "test:watch": "vitest",
     "lint": "eslint .",
     "format": "prettier --write . --ignore-path ../../.gitignore"
   },
   "devDependencies": {
+    "@vitest/browser-playwright": "^4.1.11",
+    "playwright": "^1.63.0",
     "typescript": "^6.0.3",
     "vite": "^8.3.4",
     "vitest": "^4.1.11"
