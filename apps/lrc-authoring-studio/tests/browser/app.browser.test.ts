@@ -21,12 +21,17 @@ async function applyLyrics(text: string): Promise<void> {
   await userEvent.click(el('lyrics-apply'));
 }
 
-async function loadAudio(durationMs = 8000): Promise<void> {
-  await userEvent.upload(el('file-input'), makeWav(durationMs));
+/** Waits for both the audio load and the waveform build, so nothing is pending at teardown. */
+async function waitForLoaded(name: string): Promise<void> {
   await waitFor(() => {
-    expect(el('audio-name').textContent).toBe('tone.wav');
+    expect(el('audio-name').textContent).toBe(name);
     expect(el('audio-status').textContent).toBe('');
   });
+}
+
+async function loadAudio(durationMs = 8000): Promise<void> {
+  await userEvent.upload(el('file-input'), makeWav(durationMs));
+  await waitForLoaded('tone.wav');
 }
 
 async function play(): Promise<void> {
@@ -97,15 +102,6 @@ describe('audio', () => {
     await waitFor(() => expect(el('time').textContent).toBe('0:00.000 / 0:06.000'));
   });
 
-  it('loads a file dropped anywhere on the page', async () => {
-    const data = new DataTransfer();
-    data.items.add(makeWav(4000, 'dropped.wav'));
-
-    window.dispatchEvent(new DragEvent('drop', { dataTransfer: data, cancelable: true }));
-
-    await waitFor(() => expect(el('audio-name').textContent).toBe('dropped.wav'));
-  });
-
   describe('dragging', () => {
     const dispatch = (type: string, data: DataTransfer): DragEvent => {
       const event = new DragEvent(type, { dataTransfer: data, cancelable: true });
@@ -134,8 +130,10 @@ describe('audio', () => {
       expect(dispatch('drop', textDrag()).defaultPrevented).toBe(false);
     });
 
-    it('takes over a dropped file from the browser', () => {
+    it('loads a file dropped anywhere on the page and takes it over from the browser', async () => {
       expect(dispatch('drop', fileDrag()).defaultPrevented).toBe(true);
+
+      await waitForLoaded('dropped.wav');
     });
   });
 
@@ -350,6 +348,22 @@ describe('editing times', () => {
     expect(lrcTimes(output())[0]).toBe(before + 10);
     expect(document.activeElement).toBe(chips()[0]);
     expect(chips()[0].classList.contains('selected')).toBe(true);
+  });
+
+  it('commits a typed time and still selects the chip clicked to leave the field', async () => {
+    await applyLyrics('Hello world');
+    await loadAudio();
+    await play();
+    await tapWord();
+    await tapWord();
+    await userEvent.click(chips()[0]);
+    await userEvent.fill(el('slot-ms'), '50');
+
+    await userEvent.click(chips()[1]);
+
+    expect(lrcTimes(output())[0]).toBe(50);
+    expect(el('slot-label').textContent).toBe('Line 1: world (start)');
+    expect(chips()[1].classList.contains('selected')).toBe(true);
   });
 
   it('accepts a typed time', async () => {

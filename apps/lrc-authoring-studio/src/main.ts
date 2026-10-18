@@ -5,7 +5,7 @@ import { TapHistory } from './core/history';
 import { serializeLrc } from './core/lrc';
 import { readSearchQuery } from './audio/metadata';
 import { formatClock } from './core/time';
-import { mergeLyrics } from './core/tokenize';
+import { escapeSlashes, mergeLyrics } from './core/tokenize';
 import {
   activeTokenAt,
   applyEndTap,
@@ -371,7 +371,7 @@ el<HTMLInputElement>('file-input').addEventListener('change', (e) => {
 el('choose-file').addEventListener('click', () => el<HTMLInputElement>('file-input').click());
 
 const openSearch = setupSearchDialog(el<HTMLDialogElement>('search-dialog'), (lyrics) => {
-  lyricsInput.value = lyrics;
+  lyricsInput.value = escapeSlashes(lyrics);
   applyLyrics();
 });
 el('lyrics-apply').addEventListener('click', applyLyrics);

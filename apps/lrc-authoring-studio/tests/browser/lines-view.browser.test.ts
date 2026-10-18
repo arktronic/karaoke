@@ -108,6 +108,68 @@ describe('LinesView', () => {
     expect(chip(0, 'world').classList.contains('active')).toBe(true);
   });
 
+  describe('updating in place', () => {
+    const retimed: Project = {
+      lines: [
+        {
+          tokens: [
+            { text: 'Hello', spaceAfter: true, startMs: 1500 },
+            { text: 'world', spaceAfter: false, startMs: 2500, endMs: 3000 },
+          ],
+        },
+        { tokens: [{ text: 'again', spaceAfter: false, startMs: 4000 }] },
+      ],
+    };
+
+    it('keeps the chip elements when only times change', () => {
+      const before = [...root.querySelectorAll('.line, .chip:not(.end)')];
+
+      view.render(retimed);
+
+      const after = [...root.querySelectorAll('.line, .chip:not(.end)')];
+      expect(after).toEqual(before);
+      expect(chip(0, 'Hello').querySelector('.chip-time')?.textContent).toBe('0:01.500');
+      expect(chip(1, 'again').classList.contains('timed')).toBe(true);
+    });
+
+    it('adds, updates and removes end chips next to their word', () => {
+      view.render(retimed);
+      expect([...root.querySelectorAll('.chip.end')].map((c) => c.previousElementSibling)).toEqual([
+        chip(0, 'world'),
+      ]);
+      expect(chip(0, 'end').querySelector('.chip-time')?.textContent).toBe('0:03.000');
+
+      view.render(project);
+
+      expect(root.querySelectorAll('.chip.end')).toHaveLength(1);
+      expect(chip(0, 'end').previousElementSibling).toBe(chip(0, 'Hello'));
+      expect(chip(0, 'end').querySelector('.chip-time')?.textContent).toBe('0:01.400');
+    });
+
+    it('rebuilds only the lines whose words changed and drops surplus lines', () => {
+      const [first, second] = root.querySelectorAll('.line');
+
+      view.render({
+        lines: [project.lines[0], { tokens: [{ text: 'other', spaceAfter: false }] }],
+      });
+      expect(root.querySelectorAll('.line')[0]).toBe(first);
+      expect(root.querySelectorAll('.line')[1]).not.toBe(second);
+      expect(root.querySelectorAll('.line')[1].textContent).toContain('other');
+
+      view.render({ lines: [project.lines[0]] });
+      expect(root.querySelectorAll('.line')).toHaveLength(1);
+    });
+
+    it('keeps a pending click on its chip', async () => {
+      const target = chip(1, 'again');
+      target.addEventListener('mousedown', () => view.render(retimed));
+
+      await userEvent.click(target);
+
+      expect(onSelect).toHaveBeenCalledWith({ line: 1, token: 0, kind: 'start' });
+    });
+  });
+
   describe('focus across a re-render', () => {
     it('returns to the replacement of the focused start chip', () => {
       chip(0, 'world').focus();
@@ -186,6 +248,7 @@ describe('LinesView', () => {
       tail.style.height = `${window.innerHeight}px`;
       root.before(bar, spacer);
       root.after(tail);
+      root.replaceChildren();
       root.style.cssText = 'height: 405px; overflow-y: auto';
       view = new LinesView(
         root,

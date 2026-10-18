@@ -1,5 +1,10 @@
 import type { Line, Project, Token } from './types';
 
+/** Makes plain text safe for the tokenizer: every `/` becomes a literal slash. */
+export function escapeSlashes(text: string): string {
+  return text.replaceAll('/', '\\/');
+}
+
 /** Splits on whitespace and on `/` (syllable marker); `\/` is a literal slash. */
 export function tokenizeLine(text: string): Token[] {
   const tokens: Token[] = [];

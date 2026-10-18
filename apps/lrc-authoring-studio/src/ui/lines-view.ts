@@ -1,5 +1,5 @@
 import { formatClock } from '../core/time';
-import type { Project, SlotRef, TokenRef } from '../core/types';
+import type { Line, Project, SlotRef, TokenRef } from '../core/types';
 
 export interface LinesCallbacks {
   onSelect(ref: SlotRef): void;
@@ -18,6 +18,7 @@ function sameToken(a: TokenRef | undefined, b: TokenRef | undefined): boolean {
 export class LinesView {
   private lineEls: HTMLElement[] = [];
   private chips: TokenChips[][] = [];
+  private texts: string[][] = [];
   private selected: SlotRef | undefined;
   private cursor: TokenRef | undefined;
   private active: TokenRef | undefined;
@@ -29,47 +30,38 @@ export class LinesView {
     private readonly topInset: () => number = () => 0,
   ) {}
 
+  /**
+   * Lines whose words are unchanged keep their elements and only get new times, so a click in
+   * progress still lands on its chip. Other lines are rebuilt.
+   */
   render(project: Project): void {
     const focused = this.focusedSlot();
-    this.lineEls = [];
-    this.chips = [];
-    const fragment = document.createDocumentFragment();
 
     project.lines.forEach((line, lineIndex) => {
-      const lineEl = document.createElement('div');
-      lineEl.className = 'line';
-      const number = document.createElement('span');
-      number.className = 'line-no';
-      number.textContent = String(lineIndex + 1);
-      lineEl.append(number);
-
-      const lineChips: TokenChips[] = [];
-      line.tokens.forEach((token, tokenIndex) => {
-        const start = this.createChip(
-          token.text,
-          token.startMs,
-          { line: lineIndex, token: tokenIndex, kind: 'start' },
-          false,
-        );
-        const chips: TokenChips = { start };
-        lineEl.append(start);
-        if (token.endMs !== undefined) {
-          chips.end = this.createChip(
-            'end',
-            token.endMs,
-            { line: lineIndex, token: tokenIndex, kind: 'end' },
-            true,
-          );
-          lineEl.append(chips.end);
-        }
-        lineChips.push(chips);
-      });
-      this.lineEls.push(lineEl);
-      this.chips.push(lineChips);
-      fragment.append(lineEl);
+      const texts = line.tokens.map((token) => token.text);
+      const same =
+        this.texts[lineIndex]?.length === texts.length &&
+        this.texts[lineIndex].every((text, i) => text === texts[i]);
+      if (same) {
+        this.updateLine(lineIndex, line);
+        return;
+      }
+      const { lineEl, lineChips } = this.createLine(line, lineIndex);
+      if (this.lineEls[lineIndex]) {
+        this.lineEls[lineIndex].replaceWith(lineEl);
+      } else {
+        this.root.append(lineEl);
+      }
+      this.lineEls[lineIndex] = lineEl;
+      this.chips[lineIndex] = lineChips;
+      this.texts[lineIndex] = texts;
     });
 
-    this.root.replaceChildren(fragment);
+    const count = project.lines.length;
+    this.lineEls.splice(count).forEach((lineEl) => lineEl.remove());
+    this.chips.length = count;
+    this.texts.length = count;
+
     this.reapplyMarks();
     if (focused) {
       this.chipFor(focused)?.focus({ preventScroll: true });
@@ -142,6 +134,60 @@ export class LinesView {
     if (shift !== 0) {
       window.scrollBy(0, shift);
     }
+  }
+
+  private createLine(
+    line: Line,
+    lineIndex: number,
+  ): { lineEl: HTMLElement; lineChips: TokenChips[] } {
+    const lineEl = document.createElement('div');
+    lineEl.className = 'line';
+    const number = document.createElement('span');
+    number.className = 'line-no';
+    number.textContent = String(lineIndex + 1);
+    lineEl.append(number);
+
+    const lineChips = line.tokens.map((token, tokenIndex): TokenChips => {
+      const start = this.createChip(
+        token.text,
+        token.startMs,
+        { line: lineIndex, token: tokenIndex, kind: 'start' },
+        false,
+      );
+      lineEl.append(start);
+      const chips: TokenChips = { start };
+      if (token.endMs !== undefined) {
+        chips.end = this.createEndChip(lineIndex, tokenIndex, token.endMs);
+        lineEl.append(chips.end);
+      }
+      return chips;
+    });
+    return { lineEl, lineChips };
+  }
+
+  private updateLine(lineIndex: number, line: Line): void {
+    line.tokens.forEach((token, tokenIndex) => {
+      const chips = this.chips[lineIndex][tokenIndex];
+      this.setStamp(chips.start, token.startMs);
+      if (token.endMs === undefined) {
+        chips.end?.remove();
+        delete chips.end;
+      } else if (chips.end) {
+        this.setStamp(chips.end, token.endMs);
+      } else {
+        chips.end = this.createEndChip(lineIndex, tokenIndex, token.endMs);
+        chips.start.after(chips.end);
+      }
+    });
+  }
+
+  private createEndChip(line: number, token: number, time: number): HTMLElement {
+    return this.createChip('end', time, { line, token, kind: 'end' }, true);
+  }
+
+  private setStamp(chip: HTMLElement, time: number | undefined): void {
+    chip.classList.toggle('timed', time !== undefined);
+    chip.querySelector('.chip-time')!.textContent = time === undefined ? '-' : formatClock(time);
   }
 
   private createChip(

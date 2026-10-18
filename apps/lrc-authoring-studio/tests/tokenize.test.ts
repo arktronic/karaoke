@@ -1,5 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { mergeLyrics, tokenizeLine, tokenizeLyrics } from '../src/core/tokenize';
+import { escapeSlashes, mergeLyrics, tokenizeLine, tokenizeLyrics } from '../src/core/tokenize';
+
+describe('escapeSlashes', () => {
+  it.each(['and/or', 'a\\/b', 'AC/DC 24/7', '/', 'no slash', 'back\\slash'])(
+    'keeps %j intact through the tokenizer',
+    (text) => {
+      const joined = tokenizeLine(escapeSlashes(text))
+        .map((t) => t.text + (t.spaceAfter ? ' ' : ''))
+        .join('');
+
+      expect(joined).toBe(text);
+    },
+  );
+
+  it('escapes each slash', () => {
+    expect(escapeSlashes('and/or')).toBe('and\\/or');
+  });
+});
 
 describe('tokenizeLine', () => {
   it('splits on whitespace and records spacing', () => {
