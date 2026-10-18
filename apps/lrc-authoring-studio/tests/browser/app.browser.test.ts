@@ -307,6 +307,18 @@ describe('editing times', () => {
     expect(lrcTimes(output())[0]).toBe(before + 110);
   });
 
+  it('keeps keyboard focus on a focused chip while nudging it', async () => {
+    const before = await tapOne();
+    await userEvent.click(chips()[0]);
+    expect(document.activeElement).toBe(chips()[0]);
+
+    await userEvent.keyboard('{ArrowRight}');
+
+    expect(lrcTimes(output())[0]).toBe(before + 10);
+    expect(document.activeElement).toBe(chips()[0]);
+    expect(chips()[0].classList.contains('selected')).toBe(true);
+  });
+
   it('accepts a typed time', async () => {
     await tapOne();
 

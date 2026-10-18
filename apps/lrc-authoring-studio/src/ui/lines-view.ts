@@ -30,6 +30,7 @@ export class LinesView {
   ) {}
 
   render(project: Project): void {
+    const focused = this.focusedSlot();
     this.lineEls = [];
     this.chips = [];
     const fragment = document.createDocumentFragment();
@@ -70,6 +71,9 @@ export class LinesView {
 
     this.root.replaceChildren(fragment);
     this.reapplyMarks();
+    if (focused) {
+      this.chipFor(focused)?.focus({ preventScroll: true });
+    }
   }
 
   setSelected(ref: SlotRef | undefined): void {
@@ -169,10 +173,34 @@ export class LinesView {
     });
   }
 
+  private focusedSlot(): SlotRef | undefined {
+    const focus = document.activeElement;
+    if (!focus || !this.root.contains(focus)) {
+      return undefined;
+    }
+    for (const [line, lineChips] of this.chips.entries()) {
+      for (const [token, { start, end }] of lineChips.entries()) {
+        if (focus === start) {
+          return { line, token, kind: 'start' };
+        }
+        if (focus === end) {
+          return { line, token, kind: 'end' };
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private chipFor(ref: SlotRef): HTMLElement | undefined {
+    const chips = this.chips[ref.line]?.[ref.token];
+    return ref.kind === 'end' ? chips?.end : chips?.start;
+  }
+
   private markSelected(on: boolean): void {
     const ref = this.selected;
-    const chips = ref && this.chips[ref.line]?.[ref.token];
-    (ref?.kind === 'end' ? chips?.end : chips?.start)?.classList.toggle('selected', on);
+    if (ref) {
+      this.chipFor(ref)?.classList.toggle('selected', on);
+    }
   }
 
   private markCursor(on: boolean): void {

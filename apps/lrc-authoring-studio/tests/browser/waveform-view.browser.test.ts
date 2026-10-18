@@ -71,6 +71,58 @@ describe('WaveformView pointer input', () => {
     expect(Math.abs(lastCallMs(callbacks.onSeek) - MS_AT_300)).toBeLessThan(TOLERANCE_MS);
   });
 
+  describe('while the playhead follows the pointer', () => {
+    // Moving the playhead past 90% of the window would normally scroll the view.
+    const followSeeks = (): void => {
+      callbacks.onSeek.mockImplementation((ms: number) => view.setPlayhead(ms));
+    };
+
+    afterEach(() => {
+      callbacks.onSeek.mockReset();
+      callbacks.onMarkerSelect.mockReset();
+    });
+
+    it('keeps the position mapping fixed while scrubbing', async () => {
+      followSeeks();
+
+      await userEvent.dragAndDrop(canvas, canvas, {
+        sourcePosition: { x: 570, y: 50 },
+        targetPosition: { x: 580, y: 50 },
+      });
+
+      expect(Math.abs(lastCallMs(callbacks.onSeek) - 9667)).toBeLessThan(TOLERANCE_MS);
+    });
+
+    it('keeps the position mapping fixed while dragging a marker', async () => {
+      view.setProject(project);
+      callbacks.onMarkerSelect.mockImplementation(() => view.setPlayhead(15_000));
+
+      await userEvent.dragAndDrop(canvas, canvas, {
+        sourcePosition: { x: 300, y: 50 },
+        targetPosition: { x: 420, y: 50 },
+      });
+
+      const [, ms] = callbacks.onMarkerMove.mock.lastCall!;
+      expect(Math.abs(ms - 7000)).toBeLessThan(TOLERANCE_MS);
+    });
+
+    it('catches up with the playhead on release even if it no longer changes', async () => {
+      followSeeks();
+      await userEvent.dragAndDrop(canvas, canvas, {
+        sourcePosition: { x: 570, y: 50 },
+        targetPosition: { x: 580, y: 50 },
+      });
+      const playhead = lastCallMs(callbacks.onSeek);
+      callbacks.onSeek.mockReset();
+
+      await userEvent.click(canvas, { position: { x: 300, y: 50 } });
+
+      // The view starts 10% of the window before the playhead.
+      const expected = playhead - 1000 + MS_AT_300;
+      expect(Math.abs(lastCallMs(callbacks.onSeek) - expected)).toBeLessThan(TOLERANCE_MS);
+    });
+  });
+
   describe('with a marker', () => {
     beforeEach(() => view.setProject(project));
 

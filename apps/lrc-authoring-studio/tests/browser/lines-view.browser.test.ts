@@ -108,6 +108,43 @@ describe('LinesView', () => {
     expect(chip(0, 'world').classList.contains('active')).toBe(true);
   });
 
+  describe('focus across a re-render', () => {
+    it('returns to the replacement of the focused start chip', () => {
+      chip(0, 'world').focus();
+
+      view.render(project);
+
+      expect(document.activeElement).toBe(chip(0, 'world'));
+    });
+
+    it('returns to the replacement of the focused end chip', () => {
+      chip(0, 'end').focus();
+
+      view.render(project);
+
+      expect(document.activeElement).toBe(chip(0, 'end'));
+    });
+
+    it('does not take focus from outside the view', () => {
+      const outside = document.createElement('button');
+      document.body.append(outside);
+      outside.focus();
+
+      view.render(project);
+
+      expect(document.activeElement).toBe(outside);
+      outside.remove();
+    });
+
+    it('leaves focus alone when the focused slot no longer exists', () => {
+      chip(0, 'end').focus();
+
+      view.render({ lines: [{ tokens: [{ text: 'Hello', spaceAfter: false, startMs: 1000 }] }] });
+
+      expect(root.contains(document.activeElement)).toBe(false);
+    });
+  });
+
   it('scrolls the cursor line into view inside a scrollable box', () => {
     const many: Project = {
       lines: Array.from({ length: 40 }, (_, i) => ({

@@ -45,8 +45,8 @@ export class WaveformView {
     new ResizeObserver(() => this.resize()).observe(canvas);
     canvas.addEventListener('pointerdown', (e) => this.onPointerDown(e));
     canvas.addEventListener('pointermove', (e) => this.onPointerMove(e));
-    canvas.addEventListener('pointerup', () => (this.drag = undefined));
-    canvas.addEventListener('pointercancel', () => (this.drag = undefined));
+    canvas.addEventListener('pointerup', () => this.endDrag());
+    canvas.addEventListener('pointercancel', () => this.endDrag());
     canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
     this.resize();
   }
@@ -101,7 +101,11 @@ export class WaveformView {
     this.dirty = true;
   }
 
+  /** Scrolls the view to include `ms`; does nothing during a pointer drag so the mapping stays put. */
   reveal(ms: number): void {
+    if (this.drag) {
+      return;
+    }
     if (ms < this.viewStartMs || ms > this.viewStartMs + this.windowMs * 0.9) {
       this.viewStartMs = Math.max(0, ms - this.windowMs * 0.1);
       this.dirty = true;
@@ -204,6 +208,11 @@ export class WaveformView {
       }
     }
     return best;
+  }
+
+  private endDrag(): void {
+    this.drag = undefined;
+    this.reveal(this.playheadMs);
   }
 
   private onPointerDown(e: PointerEvent): void {
