@@ -85,6 +85,18 @@ describe('applyTap', () => {
     expect(defined).toEqual([...defined].sort((x, y) => x - y));
   });
 
+  it('clears the end of a later start that a retap overtakes', () => {
+    let p = set(project('a b'), 0, 0, 'start', 100);
+    p = set(p, 0, 1, 'start', 200);
+    p = set(p, 0, 1, 'end', 500);
+
+    p = set(p, 0, 0, 'start', 300);
+    expect(times(p)).toEqual([300, undefined, undefined, undefined]);
+
+    p = moveSlotTime(p, { line: 0, token: 1, kind: 'start' }, 700);
+    expect(times(p)).toEqual([300, undefined, 700, undefined]);
+  });
+
   it('does nothing once finished', () => {
     const p = project();
     const done: Cursor = { line: 2, token: 0 };

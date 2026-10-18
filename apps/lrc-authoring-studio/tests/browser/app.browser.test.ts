@@ -128,6 +128,48 @@ describe('audio', () => {
   });
 });
 
+describe('seek slider', () => {
+  const seek = (): HTMLInputElement => el<HTMLInputElement>('seek');
+  const clock = (): string => el('time').textContent ?? '';
+
+  it('stays disabled until audio is loaded', async () => {
+    expect(seek().disabled).toBe(true);
+
+    await loadAudio(8000);
+
+    await waitFor(() => expect(seek().disabled).toBe(false));
+    expect(seek().max).toBe('8000');
+  });
+
+  it('seeks with the keyboard, including forward to untimed parts', async () => {
+    await loadAudio(8000);
+    await waitFor(() => expect(seek().disabled).toBe(false));
+    seek().focus();
+
+    await userEvent.keyboard('{ArrowRight}');
+    await waitFor(() => expect(clock()).toMatch(/^0:00\.010 /));
+
+    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}');
+    await waitFor(() => expect(clock()).toMatch(/^0:05\.010 /));
+
+    await userEvent.keyboard('{Shift>}{ArrowLeft}{/Shift}');
+    await waitFor(() => expect(clock()).toMatch(/^0:00\.010 /));
+
+    await userEvent.keyboard('{End}');
+    await waitFor(() => expect(clock()).toMatch(/^0:08\.000 /));
+
+    await userEvent.keyboard('{Home}');
+    await waitFor(() => expect(clock()).toMatch(/^0:00\.000 /));
+  });
+
+  it('follows playback', async () => {
+    await loadAudio(8000);
+    await play();
+
+    await waitFor(() => expect(seek().valueAsNumber).toBeGreaterThan(0));
+  });
+});
+
 describe('tapping', () => {
   it('ignores Space while paused', async () => {
     await applyLyrics('Hello');

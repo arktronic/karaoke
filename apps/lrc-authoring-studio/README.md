@@ -24,6 +24,8 @@ Use `/` in lyrics to split a word into separately timed syllables (`Hel/lo`); `\
 | Left / Right      | Nudge the selected time by 10 ms (Shift 100)    |
 | Double-click chip | Continue tapping from that word                 |
 
+The Seek slider above the waveform is the keyboard route to any position: focus it, then use Left / Right (10 ms, Shift 5 s), Page Up / Page Down, Home or End.
+
 Undo covers key presses only; any manual edit (drag, nudge, typed value, clear, lyrics change) resets the undo history. A word end can also be added afterwards with "Set end at playhead" or by typing its time. Clearing a word's start also clears its end.
 
 ## Output

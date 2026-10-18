@@ -47,6 +47,7 @@ const lyricsInput = el<HTMLTextAreaElement>('lyrics-input');
 const latency = el<HTMLInputElement>('latency');
 const playButton = el<HTMLButtonElement>('play');
 const timeLabel = el('time');
+const seek = el<HTMLInputElement>('seek');
 const tapStatus = el('tap-status');
 const slotLabel = el('slot-label');
 const slotMs = el<HTMLInputElement>('slot-ms');
@@ -368,6 +369,13 @@ for (const type of ['play', 'pause', 'ended']) {
 }
 el('back').addEventListener('click', () => player.loaded && player.seekMs(player.currentMs - 5000));
 el('restart').addEventListener('click', seekToStart);
+seek.addEventListener('input', () => player.loaded && player.seekMs(seek.valueAsNumber));
+seek.addEventListener('keydown', (e) => {
+  if (e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && player.loaded) {
+    e.preventDefault();
+    player.seekMs(player.currentMs + (e.key === 'ArrowLeft' ? -5000 : 5000));
+  }
+});
 el<HTMLSelectElement>('speed').addEventListener('change', (e) =>
   player.setRate(Number((e.target as HTMLSelectElement).value)),
 );
@@ -438,6 +446,10 @@ function frame(): void {
   const label = `${formatClock(ms)} / ${formatClock(player.durationMs)}`;
   if (timeLabel.textContent !== label) {
     timeLabel.textContent = label;
+    seek.disabled = !player.loaded;
+    seek.max = String(Math.floor(player.durationMs));
+    seek.value = String(Math.round(ms));
+    seek.setAttribute('aria-valuetext', label.replace(' / ', ' of '));
   }
   waveform.render();
   requestAnimationFrame(frame);

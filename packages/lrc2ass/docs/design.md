@@ -42,7 +42,7 @@ The public API provides parse, convert, and serialize stages plus a one-step fun
 - Expand every line timestamp into an occurrence. Equal starts remain distinct and retain source order.
 - For enhanced repeated lines, apply each inline timestamp's offset from the first line timestamp to every occurrence.
 - Infer a line end from the next later occurrence. For the final line, use LRC `length` metadata, `t_time` metadata, a caller-provided track end/duration, or the exported 5000 ms fallback, in that order. A bound that is not later than the final lyric is diagnosed and falls back in tolerant mode.
-- Infer an enhanced segment's end from the next inline timestamp or the containing line end. A line-final timestamp with no text after it is kept as an empty trailing segment, so it ends the previous segment instead of being dropped.
+- Infer an enhanced segment's end from the next inline timestamp or the containing line end. A line-final timestamp with no text after it is kept as an empty trailing segment, so it ends the previous segment instead of being dropped. A final-duration bound may equal that boundary, and the boundary is never extended past the next line by the `preserve` overlap policy.
 - Handle source overlaps through an explicit `preserve`, `truncate`, or `error` policy.
 - Negative or decreasing effective times fail in strict mode; tolerant mode clamps them and emits diagnostics.
 - Completely untimed lines remain in the model but cannot produce events without caller-supplied timing.

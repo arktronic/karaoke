@@ -132,6 +132,12 @@ textarea {
   background: var(--panel);
 }
 
+#seek {
+  display: block;
+  width: 100%;
+  margin: 4px 0;
+}
+
 #waveform {
   display: block;
   width: 100%;

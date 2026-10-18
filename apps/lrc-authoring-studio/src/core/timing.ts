@@ -122,6 +122,10 @@ export function setSlotTime(project: Project, ref: SlotRef, ms: number): Project
     const later = flat[i];
     if (later !== undefined && later < time) {
       flat[i] = undefined;
+      // A cleared start takes its end with it, as in clearSlotTime.
+      if (i % 2 === 0) {
+        flat[i + 1] = undefined;
+      }
     }
   }
   return fromFlat(project, flat);

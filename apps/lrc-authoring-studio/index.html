@@ -22,9 +22,10 @@
       </section>
 
       <section id="lyrics-section">
-        <h2>Lyrics</h2>
+        <h2 id="lyrics-heading">Lyrics</h2>
         <textarea
           id="lyrics-input"
+          aria-labelledby="lyrics-heading"
           rows="10"
           spellcheck="false"
           placeholder="Paste or type lyrics, one line per row"
@@ -66,6 +67,16 @@
               </select>
             </label>
           </div>
+          <input
+            type="range"
+            id="seek"
+            aria-label="Seek"
+            min="0"
+            max="0"
+            step="10"
+            value="0"
+            disabled
+          />
           <canvas id="waveform"></canvas>
           <div class="row">
             <button type="button" id="tap">Word start (Space)</button>
@@ -78,9 +89,17 @@
           </div>
           <p id="tap-status" class="hint" role="status"></p>
           <div class="row" id="slot-editor">
-            <span id="slot-label">Select a word to edit its time</span>
-            <input type="number" id="slot-ms" min="0" step="10" class="narrow" disabled />
-            <span>ms</span>
+            <label id="slot-label" for="slot-ms">Select a word to edit its time</label>
+            <input
+              type="number"
+              id="slot-ms"
+              min="0"
+              step="10"
+              class="narrow"
+              aria-describedby="slot-unit"
+              disabled
+            />
+            <span id="slot-unit">ms</span>
             <button type="button" data-nudge="-100">-100</button>
             <button type="button" data-nudge="-10">-10</button>
             <button type="button" data-nudge="10">+10</button>
@@ -101,6 +120,13 @@
             selected time by 10 ms (Shift: 100 ms). Double-click a word to continue tapping from it.
             Drag markers on the waveform to adjust them.
           </p>
+          <p class="hint">
+            The Seek slider jumps anywhere in the track. Focus it, then use <kbd>Left</kbd>/<kbd
+              >Right</kbd
+            >
+            (10 ms; Shift: 5 s), <kbd>Page Up</kbd>/<kbd>Page Down</kbd>, <kbd>Home</kbd> or
+            <kbd>End</kbd>. Clicking the waveform also seeks.
+          </p>
         </div>
         <div id="lines"></div>
       </section>
@@ -112,15 +138,26 @@
           <button type="button" id="copy" disabled>Copy</button>
         </div>
         <p id="export-status" role="status"></p>
-        <textarea id="lrc-output" rows="8" readonly spellcheck="false"></textarea>
+        <textarea
+          id="lrc-output"
+          aria-label="LRC output"
+          rows="8"
+          readonly
+          spellcheck="false"
+        ></textarea>
       </section>
     </main>
 
-    <dialog id="search-dialog">
+    <dialog id="search-dialog" aria-labelledby="search-heading">
       <form method="dialog" id="search-form">
-        <h2>Search lyrics (LRCLIB)</h2>
+        <h2 id="search-heading">Search lyrics (LRCLIB)</h2>
         <div class="row">
-          <input type="search" id="search-query" placeholder="Artist and title" />
+          <input
+            type="search"
+            id="search-query"
+            aria-label="Artist and title"
+            placeholder="Artist and title"
+          />
           <button type="submit">Search</button>
           <button type="button" id="search-close">Close</button>
         </div>
