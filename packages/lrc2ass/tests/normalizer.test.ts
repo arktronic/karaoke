@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeLyrics } from '../src/index.js';
+import { normalizeLyrics, parseLrc } from '../src/index.js';
 import type { LrcDocument } from '../src/index.js';
 
 describe('normalizeLyrics', () => {
@@ -1042,6 +1042,51 @@ describe('normalizeLyrics', () => {
       });
 
       expect(result.normalized.occurrences[0].endMs).toBe(1000);
+    });
+
+    describe('with the trailing space written by LRC exporters', () => {
+      const padded = '[00:00.00]<00:00.00>Hi<00:01.00> \n';
+      const normalizePadded = (
+        source: string,
+        options: Parameters<typeof normalizeLyrics>[1],
+      ): ReturnType<typeof normalizeLyrics> =>
+        normalizeLyrics(parseLrc(source, { mode: 'strict' }).document, options);
+
+      it.each(['strict', 'tolerant'] as const)(
+        'accepts a length metadata bound equal to the boundary in %s mode',
+        (mode) => {
+          const result = normalizePadded(`[length:00:01.00]\n${padded}`, { mode });
+
+          expect(result.diagnostics).toEqual([]);
+          expect(result.normalized.occurrences[0].endMs).toBe(1000);
+        },
+      );
+
+      it.each(['strict', 'tolerant'] as const)(
+        'accepts a trackEndMs bound equal to the boundary in %s mode',
+        (mode) => {
+          const result = normalizePadded(padded, { mode, trackEndMs: 1000 });
+
+          expect(result.diagnostics).toEqual([]);
+          expect(result.normalized.occurrences[0].endMs).toBe(1000);
+        },
+      );
+
+      it('still rejects a bound earlier than the boundary', () => {
+        const result = normalizePadded(padded, { mode: 'strict', trackEndMs: 500 });
+
+        expect(result.diagnostics[0]).toMatchObject({ code: 'LRC_FINAL_DURATION_BEFORE_LYRIC' });
+        expect(result.normalized.occurrences).toEqual([]);
+      });
+
+      it('does not extend a boundary past the next line with the trailing duration', () => {
+        const result = normalizePadded(`${padded}[00:00.50]Next\n`, {
+          overlapPolicy: 'preserve',
+          defaultTrailingDurationMs: 5000,
+        });
+
+        expect(result.normalized.occurrences[0].endMs).toBe(1000);
+      });
     });
   });
 

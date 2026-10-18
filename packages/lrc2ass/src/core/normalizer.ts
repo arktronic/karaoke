@@ -304,11 +304,11 @@ export function normalizeLyrics(
 
     let finalEnhancedSegmentStartMs: number | undefined;
     let trailingEnhancedEndMs: number | undefined;
-    // The parser only emits an empty segment for a line-final timestamp, which ends the previous word.
+    // A line-final timestamp leaves an empty or whitespace-only trailing segment that ends the previous word.
     let finalSegmentIsBoundary = false;
     if (curr.segments && curr.segments.length > 0) {
       const lastSegment = curr.segments[curr.segments.length - 1];
-      finalSegmentIsBoundary = curr.segments.length > 1 && lastSegment.text === '';
+      finalSegmentIsBoundary = curr.segments.length > 1 && lastSegment.text.trim() === '';
       const enhancedSegmentStartMs = addSafeMilliseconds(curr.startMs, lastSegment.timeMs);
       if (enhancedSegmentStartMs === undefined) {
         reportTimingOverflow(
