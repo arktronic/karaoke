@@ -332,7 +332,16 @@ document.addEventListener('keyup', (e) => {
 });
 
 const dropzone = el('dropzone');
+
+/** File data is hidden until drop, but the type list is readable during the drag. */
+function isFileDrag(e: DragEvent): boolean {
+  return e.dataTransfer?.types.includes('Files') ?? false;
+}
+
 window.addEventListener('dragover', (e) => {
+  if (!isFileDrag(e)) {
+    return;
+  }
   e.preventDefault();
   dropzone.classList.add('dragging');
 });
@@ -342,6 +351,9 @@ window.addEventListener('dragleave', (e) => {
   }
 });
 window.addEventListener('drop', (e) => {
+  if (!isFileDrag(e)) {
+    return;
+  }
   e.preventDefault();
   dropzone.classList.remove('dragging');
   const file = e.dataTransfer?.files[0];

@@ -106,6 +106,39 @@ describe('audio', () => {
     await waitFor(() => expect(el('audio-name').textContent).toBe('dropped.wav'));
   });
 
+  describe('dragging', () => {
+    const dispatch = (type: string, data: DataTransfer): DragEvent => {
+      const event = new DragEvent(type, { dataTransfer: data, cancelable: true });
+      window.dispatchEvent(event);
+      return event;
+    };
+    const fileDrag = (): DataTransfer => {
+      const data = new DataTransfer();
+      data.items.add(makeWav(4000, 'dropped.wav'));
+      return data;
+    };
+    const textDrag = (): DataTransfer => {
+      const data = new DataTransfer();
+      data.setData('text/plain', 'some lyrics');
+      return data;
+    };
+
+    it('accepts a dragged file and highlights the dropzone', () => {
+      expect(dispatch('dragover', fileDrag()).defaultPrevented).toBe(true);
+      expect(el('dropzone').classList.contains('dragging')).toBe(true);
+    });
+
+    it('leaves dragged text alone so the lyrics box can take it', () => {
+      expect(dispatch('dragover', textDrag()).defaultPrevented).toBe(false);
+      expect(el('dropzone').classList.contains('dragging')).toBe(false);
+      expect(dispatch('drop', textDrag()).defaultPrevented).toBe(false);
+    });
+
+    it('takes over a dropped file from the browser', () => {
+      expect(dispatch('drop', fileDrag()).defaultPrevented).toBe(true);
+    });
+  });
+
   it('reports files the browser cannot play', async () => {
     await userEvent.upload(
       el('file-input'),
